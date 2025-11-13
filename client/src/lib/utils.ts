@@ -5,23 +5,30 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// Create singleton formatters to avoid recreation on every call
+const currencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+})
+
+const numberFormatter = new Intl.NumberFormat('en-US')
+
+const dateFormatter = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+})
+
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
+  return currencyFormatter.format(amount)
 }
 
 export function formatNumber(num: number): string {
-  return new Intl.NumberFormat('en-US').format(num)
+  return numberFormatter.format(num)
 }
 
 export function formatDate(date: Date | string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  }).format(new Date(date))
+  return dateFormatter.format(new Date(date))
 }
 
 export function generateApiKey(): string {

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, memo } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
@@ -16,15 +16,15 @@ const UserDashboard = lazy(() => import('./pages/user/UserDashboard'))
 const UserProfile = lazy(() => import('./pages/user/UserProfile'))
 
 // Loading fallback component
-function LoadingFallback() {
+const LoadingFallback = memo(function LoadingFallback() {
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100"></div>
     </div>
   )
-}
+})
 
-function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode; requireAdmin?: boolean }) {
+const ProtectedRoute = memo(function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode; requireAdmin?: boolean }) {
   const { isAuthenticated, isAdmin } = useAuth()
 
   if (!isAuthenticated) {
@@ -36,7 +36,7 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
   }
 
   return <>{children}</>
-}
+})
 
 function AppRoutes() {
   const { isAuthenticated, isAdmin } = useAuth()

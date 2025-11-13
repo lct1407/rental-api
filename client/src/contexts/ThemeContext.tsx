@@ -17,7 +17,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const root = window.document.documentElement
-    root.classList.remove('light', 'dark')
+    // Remove only the opposite theme class, add current theme
+    const removeTheme = theme === 'light' ? 'dark' : 'light'
+    root.classList.remove(removeTheme)
     root.classList.add(theme)
     localStorage.setItem('theme', theme)
   }, [theme])

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import MainLayout from '../../components/layout/MainLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Dropdown, DropdownItem, DropdownSeparator } from '../../components/ui/dropdown'
-import { Search, Eye, MoreVertical, Plus, Download, Trash2, Edit, Ban, CheckCircle, UserPlus } from 'lucide-react'
+import { Search, Eye, MoreVertical, Download, Trash2, Edit, Ban, CheckCircle, UserPlus } from 'lucide-react'
 import { mockUsers } from '../../data/mockData'
 import { formatDate, formatNumber } from '../../lib/utils'
 import type { SubscriptionPlan, UserStatus } from '../../types'
@@ -19,18 +19,37 @@ export default function UserManagement() {
   const [currentPage, setCurrentPage] = useState(1)
   const [rowsPerPage, setRowsPerPage] = useState(10)
 
-  const filteredUsers = mockUsers.filter((user) => {
-    const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || user.status === statusFilter
-    const matchesPlan = planFilter === 'all' || user.plan === planFilter
-    return matchesSearch && matchesStatus && matchesPlan
-  })
+  // Memoize filtered users to avoid recalculating on every render
+  const filteredUsers = useMemo(() => {
+    return mockUsers.filter((user) => {
+      const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           user.email.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchesStatus = statusFilter === 'all' || user.status === statusFilter
+      const matchesPlan = planFilter === 'all' || user.plan === planFilter
+      return matchesSearch && matchesStatus && matchesPlan
+    })
+  }, [searchQuery, statusFilter, planFilter])
+
+  // Memoize user status counts
+  const userStatusCounts = useMemo(() => ({
+    active: mockUsers.filter(u => u.status === 'active').length,
+    suspended: mockUsers.filter(u => u.status === 'suspended').length,
+    inactive: mockUsers.filter(u => u.status === 'inactive').length,
+  }), [])
 
   // Pagination
   const totalPages = Math.ceil(filteredUsers.length / rowsPerPage)
   const startIndex = (currentPage - 1) * rowsPerPage
-  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + rowsPerPage)
+  const paginatedUsers = useMemo(() => 
+    filteredUsers.slice(startIndex, startIndex + rowsPerPage),
+    [filteredUsers, startIndex, rowsPerPage]
+  )
+
+  // Memoize pagination buttons
+  const paginationButtons = useMemo(() => 
+    Array.from({ length: totalPages }, (_, i) => i + 1),
+    [totalPages]
+  )
 
   const getStatusColor = (status: UserStatus) => {
     switch (status) {
@@ -104,7 +123,7 @@ export default function UserManagement() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Active</p>
                   <h3 className="text-2xl font-bold mt-2">
-                    {mockUsers.filter(u => u.status === 'active').length}
+                    {userStatusCounts.active}
                   </h3>
                 </div>
                 <div className="h-12 w-12 rounded-full bg-success/10 flex items-center justify-center">
@@ -119,7 +138,7 @@ export default function UserManagement() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Suspended</p>
                   <h3 className="text-2xl font-bold mt-2">
-                    {mockUsers.filter(u => u.status === 'suspended').length}
+                    {userStatusCounts.suspended}
                   </h3>
                 </div>
                 <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
@@ -134,7 +153,7 @@ export default function UserManagement() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Inactive</p>
                   <h3 className="text-2xl font-bold mt-2">
-                    {mockUsers.filter(u => u.status === 'inactive').length}
+                    {userStatusCounts.inactive}
                   </h3>
                 </div>
                 <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center">
@@ -316,7 +335,7 @@ export default function UserManagement() {
                     Previous
                   </Button>
                   <div className="flex gap-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    {paginationButtons.map(page => (
                       <Button
                         key={page}
                         variant={page === currentPage ? 'default' : 'outline'}

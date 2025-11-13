@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import MainLayout from '../../components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
@@ -12,11 +13,19 @@ import { Link } from 'react-router-dom'
 
 export default function UserDashboard() {
   const { user } = useAuth()
-  const userApiCalls = mockApiCalls.filter(call => call.userId === user?.id)
-  const currentPlan = pricingPlans.find(p => p.id === user?.plan)
+  
+  const userApiCalls = useMemo(() => 
+    mockApiCalls.filter(call => call.userId === user?.id),
+    [user?.id]
+  )
+  
+  const currentPlan = useMemo(() => 
+    pricingPlans.find(p => p.id === user?.plan),
+    [user?.plan]
+  )
 
   // Mock usage data for the chart
-  const usageData = [
+  const usageData = useMemo(() => [
     { day: 'Mon', calls: 120 },
     { day: 'Tue', calls: 180 },
     { day: 'Wed', calls: 150 },
@@ -24,10 +33,18 @@ export default function UserDashboard() {
     { day: 'Fri', calls: 190 },
     { day: 'Sat', calls: 90 },
     { day: 'Sun', calls: 70 },
-  ]
+  ], [])
 
-  const totalCallsThisMonth = usageData.reduce((sum, day) => sum + day.calls, 0)
-  const creditsUsed = userApiCalls.reduce((sum, call) => sum + call.credits, 0)
+  const totalCallsThisMonth = useMemo(() => 
+    usageData.reduce((sum, day) => sum + day.calls, 0),
+    [usageData]
+  )
+  
+  const creditsUsed = useMemo(() => 
+    userApiCalls.reduce((sum, call) => sum + call.credits, 0),
+    [userApiCalls]
+  )
+  
   const usagePercentage = currentPlan ? (creditsUsed / currentPlan.credits) * 100 : 0
 
   const copyApiKey = () => {

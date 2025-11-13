@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import MainLayout from '../../components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { Users, Activity, AlertCircle, DollarSign, TrendingUp, TrendingDown } from 'lucide-react'
@@ -8,13 +9,14 @@ import { formatCurrency, formatNumber } from '../../lib/utils'
 export default function AdminDashboard() {
   const kpi = mockKPIData[0]
 
-  const statusData = [
+  // Memoize expensive computations
+  const statusData = useMemo(() => [
     { name: 'Active', value: mockUsers.filter(u => u.status === 'active').length, color: '#3b82f6' },
     { name: 'Suspended', value: mockUsers.filter(u => u.status === 'suspended').length, color: '#ef4444' },
     { name: 'Inactive', value: mockUsers.filter(u => u.status === 'inactive').length, color: '#6b7280' },
-  ]
+  ], [])
 
-  const recentActivity = mockApiCalls.slice(0, 5)
+  const recentActivity = useMemo(() => mockApiCalls.slice(0, 5), [])
 
   return (
     <MainLayout isAdmin>

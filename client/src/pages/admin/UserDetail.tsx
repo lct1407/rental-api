@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import MainLayout from '../../components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
@@ -8,15 +9,30 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { ArrowLeft, Copy, RefreshCw, Save, Ban, Trash2 } from 'lucide-react'
 import { mockUsers, mockApiCalls } from '../../data/mockData'
 import { formatDate, formatNumber } from '../../lib/utils'
-import { useState } from 'react'
+import type { UserStatus } from '../../types'
 
 export default function UserDetail() {
   const { id } = useParams()
   const user = mockUsers.find(u => u.id === id)
-  const userApiCalls = mockApiCalls.filter(call => call.userId === id)
+  const userApiCalls = useMemo(() => 
+    mockApiCalls.filter(call => call.userId === id),
+    [id]
+  )
 
   const [credits, setCredits] = useState(user?.credits || 0)
-  const [status, setStatus] = useState(user?.status || 'active')
+  const [status, setStatus] = useState<UserStatus>(user?.status || 'active')
+
+  // Memoize success rate calculation
+  const successRate = useMemo(() => {
+    if (userApiCalls.length === 0) return '0.0'
+    return ((userApiCalls.filter(c => c.status === 200).length / userApiCalls.length) * 100).toFixed(1)
+  }, [userApiCalls])
+
+  // Memoize credit usage calculation
+  const creditUsage = useMemo(() => 
+    formatNumber(userApiCalls.reduce((sum, call) => sum + call.credits, 0)),
+    [userApiCalls]
+  )
 
   if (!user) {
     return (
@@ -115,7 +131,7 @@ export default function UserDetail() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Success Rate</label>
                 <Input
-                  value={`${((userApiCalls.filter(c => c.status === 200).length / userApiCalls.length) * 100).toFixed(1)}%`}
+                  value={`${successRate}%`}
                   disabled
                 />
               </div>
@@ -146,7 +162,7 @@ export default function UserDetail() {
               </div>
               <div className="p-4 bg-muted rounded-md">
                 <p className="text-sm text-muted-foreground">
-                  Credit usage this month: {formatNumber(userApiCalls.reduce((sum, call) => sum + call.credits, 0))}
+                  Credit usage this month: {creditUsage}
                 </p>
               </div>
             </CardContent>
@@ -181,7 +197,7 @@ export default function UserDetail() {
                 <label className="text-sm font-medium">Account Status</label>
                 <select
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as any)}
+                  onChange={(e) => setStatus(e.target.value as UserStatus)}
                   className="w-full px-3 py-2 rounded-md border border-input bg-background"
                 >
                   <option value="active">Active</option>
