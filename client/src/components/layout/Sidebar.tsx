@@ -16,8 +16,6 @@ import {
   HelpCircle,
   BookOpen,
   DollarSign,
-  FileCode,
-  Map,
   PieChart,
   ChevronDown,
   ChevronRight,
@@ -133,7 +131,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
           </button>
           {isOpen && (
             <div className="ml-4 space-y-1 border-l-2 border-border pl-2">
-              {item.children.map(child => renderMenuItem(child, depth + 1))}
+              {item.children?.map(child => renderMenuItem(child, depth + 1))}
             </div>
           )}
         </div>
