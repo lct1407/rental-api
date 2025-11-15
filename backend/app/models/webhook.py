@@ -48,7 +48,7 @@ class Webhook(Base):
     last_error = Column(Text)
 
     # Metadata
-    metadata = Column(JSON, default={}, nullable=False)
+    user_metadata = Column(JSON, default={}, nullable=False)
 
     # Relationships
     user = relationship("User", back_populates="webhooks")
@@ -97,7 +97,7 @@ class WebhookDelivery(Base):
     error_traceback = Column(Text)
 
     # Metadata
-    metadata = Column(JSON, default={}, nullable=False)
+    user_metadata = Column(JSON, default={}, nullable=False)
 
     # Relationships
     webhook = relationship("Webhook", back_populates="deliveries")

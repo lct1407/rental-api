@@ -79,7 +79,7 @@ class Subscription(Base):
     limits = Column(JSON, default={}, nullable=False)
 
     # Metadata
-    metadata = Column(JSON, default={}, nullable=False)
+    user_metadata = Column(JSON, default={}, nullable=False)
 
     # Relationships
     user = relationship("User", back_populates="subscriptions")
@@ -137,7 +137,7 @@ class Payment(Base):
     credits_purchased = Column(Integer, default=0, nullable=False)
 
     # Metadata
-    metadata = Column(JSON, default={}, nullable=False)
+    user_metadata = Column(JSON, default={}, nullable=False)
 
     # Relationships
     user = relationship("User", back_populates="payments")
@@ -184,7 +184,7 @@ class Invoice(Base):
     line_items = Column(JSON, default=[], nullable=False)
 
     # Metadata
-    metadata = Column(JSON, default={}, nullable=False)
+    user_metadata = Column(JSON, default={}, nullable=False)
 
     def __repr__(self):
         return f"<Invoice(id={self.id}, number={self.invoice_number}, status={self.status})>"
@@ -206,7 +206,7 @@ class CreditTransaction(Base):
     description = Column(Text)
 
     # Metadata
-    metadata = Column(JSON, default={}, nullable=False)
+    user_metadata = Column(JSON, default={}, nullable=False)
 
     def __repr__(self):
         return f"<CreditTransaction(id={self.id}, user_id={self.user_id}, amount={self.amount})>"

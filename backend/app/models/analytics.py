@@ -40,7 +40,7 @@ class ApiUsageLog(Base):
     credits_consumed = Column(Integer, default=1, nullable=False)
 
     # Metadata
-    metadata = Column(JSON, default={}, nullable=False)
+    user_metadata = Column(JSON, default={}, nullable=False)
 
     # Relationships
     api_key = relationship("ApiKey", back_populates="usage_logs")
@@ -71,7 +71,7 @@ class SystemMetric(Base):
     labels = Column(JSON, default={}, nullable=False)
 
     # Metadata
-    metadata = Column(JSON, default={}, nullable=False)
+    user_metadata = Column(JSON, default={}, nullable=False)
 
     # Indexes
     __table_args__ = (
@@ -101,7 +101,7 @@ class UserActivity(Base):
     user_agent = Column(String(500))
 
     # Metadata
-    metadata = Column(JSON, default={}, nullable=False)
+    user_metadata = Column(JSON, default={}, nullable=False)
 
     # Indexes
     __table_args__ = (

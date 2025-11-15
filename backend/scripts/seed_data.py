@@ -11,15 +11,15 @@ from decimal import Decimal
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.database import get_db, engine
 from app.models import (
     User, UserRole, UserStatus, SubscriptionPlan,
     Organization, OrganizationMember, OrganizationRole,
-    ApiKey, Webhook, Subscription, SubscriptionStatus, BillingCycle,
+    ApiKey, Webhook, Subscription, SubscriptionStatus,
     Payment, PaymentProvider, PaymentStatus,
-    CreditTransaction, TransactionType
+    CreditTransaction
 )
 from app.core.security import SecurityManager
 from app.services.api_key_service import ApiKeyService
@@ -30,30 +30,30 @@ async def clear_database(db: AsyncSession):
     print("🗑️  Clearing database...")
 
     # Delete in correct order (respecting foreign keys)
-    await db.execute("DELETE FROM security_events")
-    await db.execute("DELETE FROM audit_logs")
-    await db.execute("DELETE FROM user_activities")
-    await db.execute("DELETE FROM system_metrics")
-    await db.execute("DELETE FROM api_usage_logs")
-    await db.execute("DELETE FROM credit_transactions")
-    await db.execute("DELETE FROM invoices")
-    await db.execute("DELETE FROM payments")
-    await db.execute("DELETE FROM subscriptions")
-    await db.execute("DELETE FROM webhook_deliveries")
-    await db.execute("DELETE FROM webhooks")
-    await db.execute("DELETE FROM api_keys")
-    await db.execute("DELETE FROM organization_invitations")
-    await db.execute("DELETE FROM organization_members")
-    await db.execute("DELETE FROM organizations")
-    await db.execute("DELETE FROM users")
+    await db.execute(text("DELETE FROM security_events"))
+    await db.execute(text("DELETE FROM audit_logs"))
+    await db.execute(text("DELETE FROM user_activities"))
+    await db.execute(text("DELETE FROM system_metrics"))
+    await db.execute(text("DELETE FROM api_usage_logs"))
+    await db.execute(text("DELETE FROM credit_transactions"))
+    await db.execute(text("DELETE FROM invoices"))
+    await db.execute(text("DELETE FROM payments"))
+    await db.execute(text("DELETE FROM subscriptions"))
+    await db.execute(text("DELETE FROM webhook_deliveries"))
+    await db.execute(text("DELETE FROM webhooks"))
+    await db.execute(text("DELETE FROM api_keys"))
+    await db.execute(text("DELETE FROM organization_invitations"))
+    await db.execute(text("DELETE FROM organization_members"))
+    await db.execute(text("DELETE FROM organizations"))
+    await db.execute(text("DELETE FROM users"))
 
     # Reset sequences
-    await db.execute("ALTER SEQUENCE users_id_seq RESTART WITH 1")
-    await db.execute("ALTER SEQUENCE organizations_id_seq RESTART WITH 1")
-    await db.execute("ALTER SEQUENCE api_keys_id_seq RESTART WITH 1")
-    await db.execute("ALTER SEQUENCE webhooks_id_seq RESTART WITH 1")
-    await db.execute("ALTER SEQUENCE subscriptions_id_seq RESTART WITH 1")
-    await db.execute("ALTER SEQUENCE payments_id_seq RESTART WITH 1")
+    await db.execute(text("ALTER SEQUENCE users_id_seq RESTART WITH 1"))
+    await db.execute(text("ALTER SEQUENCE organizations_id_seq RESTART WITH 1"))
+    await db.execute(text("ALTER SEQUENCE api_keys_id_seq RESTART WITH 1"))
+    await db.execute(text("ALTER SEQUENCE webhooks_id_seq RESTART WITH 1"))
+    await db.execute(text("ALTER SEQUENCE subscriptions_id_seq RESTART WITH 1"))
+    await db.execute(text("ALTER SEQUENCE payments_id_seq RESTART WITH 1"))
 
     await db.commit()
     print("✅ Database cleared")
@@ -180,25 +180,26 @@ async def seed_organizations(db: AsyncSession, users: list):
             "name": "Acme Corporation",
             "slug": "acme-corp",
             "description": "Leading provider of business solutions",
-            "owner_id": users[1].id  # John
+            "owner_user_id": users[1].id  # John
         },
         {
             "name": "StartupIO",
             "slug": "startup-io",
             "description": "Innovative startup building the future",
-            "owner_id": users[2].id  # Jane
+            "owner_user_id": users[2].id  # Jane
         },
         {
             "name": "Enterprise Solutions",
             "slug": "enterprise-solutions",
             "description": "Enterprise-grade software solutions",
-            "owner_id": users[4].id  # Alice
+            "owner_user_id": users[4].id  # Alice
         }
     ]
 
     created_orgs = []
 
     for org_data in orgs_data:
+        owner_id = org_data.pop("owner_user_id")
         org = Organization(**org_data)
         db.add(org)
         await db.flush()
@@ -206,7 +207,7 @@ async def seed_organizations(db: AsyncSession, users: list):
         # Add owner as member
         member = OrganizationMember(
             organization_id=org.id,
-            user_id=org.owner_id,
+            user_id=owner_id,
             role=OrganizationRole.OWNER
         )
         db.add(member)
@@ -309,6 +310,7 @@ async def seed_webhooks(db: AsyncSession, users: list, organizations: list):
         {
             "user_id": users[1].id,  # John
             "organization_id": organizations[0].id,
+            "name": "Acme Production Webhook",
             "url": "https://acme.com/webhooks/api-events",
             "events": ["api_key.created", "api_key.deleted", "payment.succeeded"],
             "description": "Acme production webhook",
@@ -318,6 +320,7 @@ async def seed_webhooks(db: AsyncSession, users: list, organizations: list):
         {
             "user_id": users[2].id,  # Jane
             "organization_id": organizations[1].id,
+            "name": "Subscription Events Webhook",
             "url": "https://startup.io/api/webhooks",
             "events": ["subscription.created", "subscription.cancelled", "payment.failed"],
             "description": "Subscription events webhook",
@@ -327,6 +330,7 @@ async def seed_webhooks(db: AsyncSession, users: list, organizations: list):
         {
             "user_id": users[4].id,  # Alice
             "organization_id": organizations[2].id,
+            "name": "Enterprise All Events",
             "url": "https://enterprise.com/webhooks/all",
             "events": ["*"],
             "description": "All events webhook",
@@ -360,28 +364,31 @@ async def seed_subscriptions(db: AsyncSession, users: list):
             "user_id": users[1].id,  # John - Pro plan
             "plan": SubscriptionPlan.PRO,
             "status": SubscriptionStatus.ACTIVE,
-            "billing_cycle": BillingCycle.MONTHLY,
+            "billing_cycle": "monthly",
+            "price": Decimal("49.99"),
+            "provider": PaymentProvider.STRIPE,
             "current_period_start": datetime.utcnow() - timedelta(days=10),
-            "current_period_end": datetime.utcnow() + timedelta(days=20),
-            "auto_renew": True
+            "current_period_end": datetime.utcnow() + timedelta(days=20)
         },
         {
             "user_id": users[2].id,  # Jane - Basic plan
             "plan": SubscriptionPlan.BASIC,
             "status": SubscriptionStatus.ACTIVE,
-            "billing_cycle": BillingCycle.YEARLY,
+            "billing_cycle": "yearly",
+            "price": Decimal("199.99"),
+            "provider": PaymentProvider.PAYPAL,
             "current_period_start": datetime.utcnow() - timedelta(days=30),
-            "current_period_end": datetime.utcnow() + timedelta(days=335),
-            "auto_renew": True
+            "current_period_end": datetime.utcnow() + timedelta(days=335)
         },
         {
             "user_id": users[4].id,  # Alice - Enterprise plan
             "plan": SubscriptionPlan.ENTERPRISE,
             "status": SubscriptionStatus.ACTIVE,
-            "billing_cycle": BillingCycle.YEARLY,
+            "billing_cycle": "yearly",
+            "price": Decimal("1999.99"),
+            "provider": PaymentProvider.STRIPE,
             "current_period_start": datetime.utcnow() - timedelta(days=60),
-            "current_period_end": datetime.utcnow() + timedelta(days=305),
-            "auto_renew": True
+            "current_period_end": datetime.utcnow() + timedelta(days=305)
         }
     ]
 
@@ -411,7 +418,7 @@ async def seed_payments(db: AsyncSession, users: list, subscriptions: list):
             "subscription_id": subscriptions[0].id,
             "amount": Decimal("49.99"),
             "currency": "USD",
-            "status": PaymentStatus.COMPLETED,
+            "status": PaymentStatus.SUCCEEDED,
             "provider": PaymentProvider.STRIPE,
             "provider_transaction_id": "pi_3Abc123Stripe",
             "payment_method": "card",
@@ -423,7 +430,7 @@ async def seed_payments(db: AsyncSession, users: list, subscriptions: list):
             "subscription_id": subscriptions[1].id,
             "amount": Decimal("199.99"),
             "currency": "USD",
-            "status": PaymentStatus.COMPLETED,
+            "status": PaymentStatus.SUCCEEDED,
             "provider": PaymentProvider.PAYPAL,
             "provider_transaction_id": "PAYID-ABC123",
             "payment_method": "paypal",
@@ -435,7 +442,7 @@ async def seed_payments(db: AsyncSession, users: list, subscriptions: list):
             "subscription_id": subscriptions[2].id,
             "amount": Decimal("1999.99"),
             "currency": "USD",
-            "status": PaymentStatus.COMPLETED,
+            "status": PaymentStatus.SUCCEEDED,
             "provider": PaymentProvider.STRIPE,
             "provider_transaction_id": "pi_3Xyz789Stripe",
             "payment_method": "card",
@@ -446,7 +453,7 @@ async def seed_payments(db: AsyncSession, users: list, subscriptions: list):
             "user_id": users[1].id,
             "amount": Decimal("100.00"),
             "currency": "USD",
-            "status": PaymentStatus.COMPLETED,
+            "status": PaymentStatus.SUCCEEDED,
             "provider": PaymentProvider.STRIPE,
             "provider_transaction_id": "pi_credits123",
             "payment_method": "card",
@@ -480,53 +487,46 @@ async def seed_credit_transactions(db: AsyncSession, users: list, subscriptions:
         {
             "user_id": users[1].id,
             "amount": 5000,
-            "transaction_type": TransactionType.SUBSCRIPTION,
+            "transaction_type": "subscription",
             "description": "Pro plan monthly credits",
-            "reference_id": subscriptions[0].id,
-            "reference_type": "subscription",
             "balance_after": 5000
         },
         {
             "user_id": users[1].id,
             "amount": -100,
-            "transaction_type": TransactionType.USAGE,
+            "transaction_type": "usage",
             "description": "API usage deduction",
             "balance_after": 4900
         },
         {
             "user_id": users[1].id,
             "amount": 1000,
-            "transaction_type": TransactionType.PURCHASE,
+            "transaction_type": "purchase",
             "description": "Credit purchase",
-            "reference_id": payments[3].id,
-            "reference_type": "payment",
+            "payment_id": payments[3].id,
             "balance_after": 5900
         },
         # Jane's transactions
         {
             "user_id": users[2].id,
             "amount": 1000,
-            "transaction_type": TransactionType.SUBSCRIPTION,
+            "transaction_type": "subscription",
             "description": "Basic plan monthly credits",
-            "reference_id": subscriptions[1].id,
-            "reference_type": "subscription",
             "balance_after": 1000
         },
         # Alice's transactions
         {
             "user_id": users[4].id,
             "amount": 50000,
-            "transaction_type": TransactionType.SUBSCRIPTION,
+            "transaction_type": "subscription",
             "description": "Enterprise plan monthly credits",
-            "reference_id": subscriptions[2].id,
-            "reference_type": "subscription",
             "balance_after": 50000
         },
         # Bob's bonus
         {
             "user_id": users[3].id,
             "amount": 100,
-            "transaction_type": TransactionType.BONUS,
+            "transaction_type": "bonus",
             "description": "Welcome bonus",
             "balance_after": 100
         }

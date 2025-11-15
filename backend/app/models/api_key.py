@@ -41,7 +41,7 @@ class ApiKey(Base):
     is_active = Column(Boolean, default=True, nullable=False)
 
     # Metadata
-    metadata = Column(JSON, default={}, nullable=False)
+    user_metadata = Column(JSON, default={}, nullable=False)
     description = Column(Text)
 
     # Relationships

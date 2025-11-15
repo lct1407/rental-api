@@ -2,7 +2,7 @@
 Organization models for multi-tenancy support
 Using incremental bigint IDs
 """
-from sqlalchemy import Column, String, Integer, JSON, Boolean, Enum, ForeignKey, BigInteger
+from sqlalchemy import Column, String, Integer, JSON, Boolean, Enum, ForeignKey, BigInteger, DateTime
 from sqlalchemy.orm import relationship
 from app.database import Base
 import enum
@@ -57,7 +57,7 @@ class Organization(Base):
     features = Column(JSON, default=[], nullable=False)
 
     # Metadata
-    metadata = Column(JSON, default={}, nullable=False)
+    user_metadata = Column(JSON, default={}, nullable=False)
 
     # Relationships
     members = relationship(
@@ -108,7 +108,7 @@ class OrganizationMember(Base):
     is_active = Column(Boolean, default=True, nullable=False)
 
     # Metadata
-    metadata = Column(JSON, default={}, nullable=False)
+    user_metadata = Column(JSON, default={}, nullable=False)
 
     # Relationships
     user = relationship("User", back_populates="organizations")
@@ -133,14 +133,14 @@ class OrganizationInvitation(Base):
 
     # Token
     token = Column(String(255), unique=True, index=True, nullable=False)
-    expires_at = Column(Column(String(255), nullable=False))
+    expires_at = Column(DateTime(timezone=True), nullable=False)
 
     # Status
     accepted = Column(Boolean, default=False, nullable=False)
-    accepted_at = Column(Column(String(255)))
+    accepted_at = Column(DateTime(timezone=True))
 
     # Metadata
-    metadata = Column(JSON, default={}, nullable=False)
+    user_metadata = Column(JSON, default={}, nullable=False)
 
     def __repr__(self):
         return f"<OrganizationInvitation(email={self.email}, org_id={self.organization_id})>"

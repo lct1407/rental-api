@@ -75,7 +75,7 @@ class User(Base):
     }, nullable=False)
 
     # Metadata
-    metadata = Column(JSON, default={}, nullable=False)
+    user_metadata = Column(JSON, default={}, nullable=False)
 
     # Relationships
     api_keys = relationship(

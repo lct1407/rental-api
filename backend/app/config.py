@@ -3,7 +3,7 @@ Application configuration using Pydantic Settings
 """
 from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 
 
 class Settings(BaseSettings):
@@ -79,17 +79,19 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
     ALLOWED_HOSTS: str = "localhost,127.0.0.1"
 
-    @validator("ALLOWED_ORIGINS", pre=True)
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
     def parse_origins(cls, v):
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
-        return v
+            return v
+        return ",".join(v) if isinstance(v, list) else v
 
-    @validator("ALLOWED_HOSTS", pre=True)
+    @field_validator("ALLOWED_HOSTS", mode="before")
+    @classmethod
     def parse_hosts(cls, v):
         if isinstance(v, str):
-            return [host.strip() for host in v.split(",")]
-        return v
+            return v
+        return ",".join(v) if isinstance(v, list) else v
 
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
@@ -124,11 +126,12 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE: int = 10485760  # 10MB
     ALLOWED_EXTENSIONS: str = "jpg,jpeg,png,gif,pdf"
 
-    @validator("ALLOWED_EXTENSIONS", pre=True)
+    @field_validator("ALLOWED_EXTENSIONS", mode="before")
+    @classmethod
     def parse_extensions(cls, v):
         if isinstance(v, str):
-            return [ext.strip() for ext in v.split(",")]
-        return v
+            return v
+        return ",".join(v) if isinstance(v, list) else v
 
     # Two-Factor Authentication
     TWO_FACTOR_ISSUER: str = "API Management Platform"

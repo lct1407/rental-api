@@ -2,7 +2,7 @@
 Audit log model with incremental bigint ID
 Tracks all important system actions for security and compliance
 """
-from sqlalchemy import Column, String, Integer, JSON, DateTime, ForeignKey, BigInteger, Text, Index, Enum
+from sqlalchemy import Column, String, Integer, JSON, DateTime, ForeignKey, BigInteger, Text, Index, Enum, Boolean
 from sqlalchemy.orm import relationship
 from app.database import Base
 import enum
@@ -89,11 +89,11 @@ class AuditLog(Base):
     new_values = Column(JSON)
 
     # Status
-    success = Column(Column(String(50), default=True, nullable=False))
+    success = Column(Boolean, default=True, nullable=False)
     error_message = Column(Text)
 
     # Metadata
-    metadata = Column(JSON, default={}, nullable=False)
+    user_metadata = Column(JSON, default={}, nullable=False)
 
     # Relationships
     user = relationship("User", back_populates="audit_logs")
@@ -129,12 +129,12 @@ class SecurityEvent(Base):
     endpoint = Column(String(500))
 
     # Status
-    resolved = Column(Column(String(50), default=False, nullable=False))
+    resolved = Column(Boolean, default=False, nullable=False)
     resolved_at = Column(DateTime(timezone=True))
     resolved_by_id = Column(BigInteger, ForeignKey("users.id", ondelete="SET NULL"))
 
     # Metadata
-    metadata = Column(JSON, default={}, nullable=False)
+    user_metadata = Column(JSON, default={}, nullable=False)
 
     # Indexes
     __table_args__ = (

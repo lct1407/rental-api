@@ -39,7 +39,6 @@ from app.schemas.auth import (
     TwoFactorDisable,
     PasswordResetRequest,
     PasswordReset,
-    EmailVerify,
     LogoutRequest
 )
 
