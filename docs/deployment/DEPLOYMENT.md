@@ -76,7 +76,7 @@ sudo su - rentapi
 ```bash
 cd /home/rentapi
 git clone https://github.com/lct1407/rental-api.git
-cd rental-api/backend
+cd rental-api
 ```
 
 ### 5. Setup Virtual Environment
@@ -85,7 +85,7 @@ cd rental-api/backend
 python3.11 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements/requirements.txt
 ```
 
 ---
@@ -147,7 +147,7 @@ sudo systemctl restart postgresql
 ### 3. Run Database Migrations
 
 ```bash
-cd /home/rentapi/rental-api/backend
+cd /home/rentapi/rental-api
 source venv/bin/activate
 alembic upgrade head
 ```
@@ -203,7 +203,7 @@ PING
 ### 1. Create Production Environment File
 
 ```bash
-cd /home/rentapi/rental-api/backend
+cd /home/rentapi/rental-api
 nano .env.production
 ```
 
@@ -272,10 +272,10 @@ After=network.target postgresql.service redis.service
 Type=notify
 User=rentapi
 Group=rentapi
-WorkingDirectory=/home/rentapi/rental-api/backend
-Environment="PATH=/home/rentapi/rental-api/backend/venv/bin"
-EnvironmentFile=/home/rentapi/rental-api/backend/.env.production
-ExecStart=/home/rentapi/rental-api/backend/venv/bin/uvicorn app.main:app \
+WorkingDirectory=/home/rentapi/rental-api
+Environment="PATH=/home/rentapi/rental-api/venv/bin"
+EnvironmentFile=/home/rentapi/rental-api/.env.production
+ExecStart=/home/rentapi/rental-api/venv/bin/uvicorn app.main:app \
     --host 0.0.0.0 \
     --port 8000 \
     --workers 4 \
@@ -317,10 +317,10 @@ After=network.target redis.service
 Type=forking
 User=rentapi
 Group=rentapi
-WorkingDirectory=/home/rentapi/rental-api/backend
-Environment="PATH=/home/rentapi/rental-api/backend/venv/bin"
-EnvironmentFile=/home/rentapi/rental-api/backend/.env.production
-ExecStart=/home/rentapi/rental-api/backend/venv/bin/celery -A app.core.celery_app worker \
+WorkingDirectory=/home/rentapi/rental-api
+Environment="PATH=/home/rentapi/rental-api/venv/bin"
+EnvironmentFile=/home/rentapi/rental-api/.env.production
+ExecStart=/home/rentapi/rental-api/venv/bin/celery -A app.core.celery_app worker \
     --loglevel=info \
     --concurrency=4 \
     --pidfile=/var/run/celery/worker.pid \
@@ -347,10 +347,10 @@ After=network.target redis.service
 Type=simple
 User=rentapi
 Group=rentapi
-WorkingDirectory=/home/rentapi/rental-api/backend
-Environment="PATH=/home/rentapi/rental-api/backend/venv/bin"
-EnvironmentFile=/home/rentapi/rental-api/backend/.env.production
-ExecStart=/home/rentapi/rental-api/backend/venv/bin/celery -A app.core.celery_app beat \
+WorkingDirectory=/home/rentapi/rental-api
+Environment="PATH=/home/rentapi/rental-api/venv/bin"
+EnvironmentFile=/home/rentapi/rental-api/.env.production
+ExecStart=/home/rentapi/rental-api/venv/bin/celery -A app.core.celery_app beat \
     --loglevel=info \
     --pidfile=/var/run/celery/beat.pid \
     --logfile=/var/log/celery/beat.log
@@ -608,9 +608,10 @@ Add:
 ```bash
 # Backup application files
 sudo tar -czf /var/backups/rentapi/app_$(date +%Y%m%d).tar.gz \
-    /home/rentapi/rental-api/backend \
+    /home/rentapi/rental-api \
     --exclude=venv \
-    --exclude=__pycache__
+    --exclude=__pycache__ \
+    --exclude=client/node_modules
 ```
 
 ---
@@ -718,13 +719,12 @@ cd /home/rentapi/rental-api
 git pull origin main
 
 # Activate venv
-source backend/venv/bin/activate
+source venv/bin/activate
 
 # Install updated dependencies
-pip install -r backend/requirements.txt
+pip install -r requirements/requirements.txt
 
 # Run migrations
-cd backend
 alembic upgrade head
 
 # Restart services

@@ -13,14 +13,14 @@ This PR adds comprehensive Swagger/OpenAPI documentation to the Enterprise API M
 ### Changes Made
 
 #### New Files
-- **backend/app/core/openapi_config.py**: Comprehensive OpenAPI configuration module
+- **app/core/openapi_config.py**: Comprehensive OpenAPI configuration module
   - Detailed tag descriptions for all 8 API categories (System, Authentication, Users, API Keys, Webhooks, Subscriptions, Admin, WebSocket)
   - Security scheme definitions for both Bearer JWT and API Key authentication
   - Server configurations for production, staging, and development environments
   - External documentation links
   - Custom response examples for common HTTP status codes
 
-- **backend/API_DOCUMENTATION.md**: Complete developer-friendly API usage guide
+- **docs/API_DOCUMENTATION.md**: Complete developer-friendly API usage guide
   - Quick start guide with server setup instructions
   - Detailed authentication guide (JWT Bearer Token and API Key)
   - Complete endpoint reference with 50+ documented endpoints
@@ -36,13 +36,13 @@ This PR adds comprehensive Swagger/OpenAPI documentation to the Enterprise API M
   - Webhook events documentation (16+ event types)
 
 #### Modified Files
-- **backend/app/main.py**: Integrated enhanced OpenAPI configuration
+- **app/main.py**: Integrated enhanced OpenAPI configuration
   - Imported new OpenAPI configuration functions
   - Applied comprehensive metadata including contact info, license, and terms
   - Added custom OpenAPI schema generator for better documentation
   - Enhanced Swagger UI with organized tags and descriptions
 
-- **backend/app/schemas/auth.py**: Enhanced schema examples for Swagger UI
+- **app/schemas/auth.py**: Enhanced schema examples for Swagger UI
   - Added ConfigDict with json_schema_extra for all 11 authentication schemas
   - Added missing `TwoFactorLogin` schema for 2FA login flow
   - Added missing `PasswordChange` schema for password updates
@@ -114,7 +114,7 @@ Once deployed:
 - **Swagger UI**: `https://api.example.com/docs`
 - **ReDoc**: `https://api.example.com/redoc`
 - **OpenAPI JSON**: `https://api.example.com/openapi.json`
-- **API Guide**: `backend/API_DOCUMENTATION.md`
+- **API Guide**: `docs/API_DOCUMENTATION.md`
 
 ## Test Plan
 
@@ -131,10 +131,10 @@ Once deployed:
 ## Files Changed
 
 ```
-backend/app/core/openapi_config.py (new file)      +371 lines
-backend/API_DOCUMENTATION.md (new file)            +594 lines
-backend/app/main.py (modified)                     +21 -49 lines
-backend/app/schemas/auth.py (modified)             +119 lines
+app/core/openapi_config.py (new file)      +371 lines
+docs/API_DOCUMENTATION.md (new file)       +594 lines
+app/main.py (modified)                     +21 -49 lines
+app/schemas/auth.py (modified)             +119 lines
 
 Total: 4 files changed, 1,056 insertions(+), 49 deletions(-)
 ```
@@ -150,12 +150,12 @@ Addresses the need for comprehensive API documentation as the platform grows and
 ## How to Review
 
 1. Pull the branch: `git checkout claude/add-swagger-docs-01YS9Q3f1TTqQW2bvQLEd1m9`
-2. Start the server: `cd backend && uvicorn app.main:app --reload`
+2. Start the server: `uvicorn app.main:app --reload`
 3. Open Swagger UI: http://localhost:8000/docs
 4. Explore the organized API documentation
 5. Test endpoints using "Try it out" button
-6. Review the API_DOCUMENTATION.md guide
-7. Check the openapi_config.py for customizations
+6. Review the docs/API_DOCUMENTATION.md guide
+7. Check the app/core/openapi_config.py for customizations
 
 ## Screenshots
 

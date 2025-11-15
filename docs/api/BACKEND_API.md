@@ -48,7 +48,7 @@
 
 ```bash
 git clone https://github.com/lct1407/rental-api.git
-cd rental-api/backend
+cd rental-api
 ```
 
 ### 2. Create Virtual Environment
@@ -61,7 +61,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 ### 3. Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements/requirements.txt
 ```
 
 ### 4. Configure Environment
@@ -294,7 +294,7 @@ All tables use **incremental bigint IDs** (NOT UUID).
 
 ```bash
 # Install test dependencies
-pip install -r requirements-dev.txt
+pip install -r requirements/requirements-dev.txt
 
 # Run tests
 pytest
@@ -306,7 +306,7 @@ pytest --cov=app --cov-report=html
 ## 📦 Project Structure
 
 ```
-backend/
+rental-api/
 ├── app/
 │   ├── api/
 │   │   ├── dependencies.py       # Common dependencies
@@ -336,8 +336,12 @@ backend/
 ├── scripts/
 │   └── seed_data.py              # Database seeding
 ├── tests/                        # Test suite
-├── requirements.txt              # Dependencies
-└── README.md                     # This file
+├── requirements/
+│   ├── requirements.txt          # Dependencies
+│   └── requirements-dev.txt      # Dev dependencies
+├── client/                       # Frontend application
+├── alembic.ini                   # Alembic configuration
+└── BACKEND_README.md             # This file
 ```
 
 ## 🔧 Configuration
