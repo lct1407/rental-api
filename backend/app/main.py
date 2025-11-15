@@ -14,8 +14,9 @@ from app.config import settings
 from app.database import engine, get_db
 from app.core.middleware import (
     RateLimitMiddleware,
-    RequestLoggingMiddleware,
-    SecurityHeadersMiddleware
+    LoggingMiddleware as RequestLoggingMiddleware,
+    SecurityHeadersMiddleware,
+    CreditAndRateLimitHeadersMiddleware
 )
 from app.core.cache import RedisCache
 from app.core.openapi_config import (
@@ -26,6 +27,7 @@ from app.core.openapi_config import (
 
 # Import API routers
 from app.api.v1 import auth, users, api_keys, webhooks, subscriptions, admin, websocket
+from app.api.v1 import credits, admin_credits
 
 
 # Configure logging
@@ -146,6 +148,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Custom middleware (order matters - last added is executed first)
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(CreditAndRateLimitHeadersMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
@@ -269,7 +272,9 @@ async def root():
             "api_keys": "/api/v1/api-keys",
             "webhooks": "/api/v1/webhooks",
             "subscriptions": "/api/v1/subscriptions",
+            "credits": "/api/v1/credits",
             "admin": "/api/v1/admin",
+            "admin_credits": "/api/v1/admin/credits",
             "websocket": "/api/v1/ws"
         }
     }
@@ -283,7 +288,9 @@ app.include_router(users.router, prefix=api_v1_prefix)
 app.include_router(api_keys.router, prefix=api_v1_prefix)
 app.include_router(webhooks.router, prefix=api_v1_prefix)
 app.include_router(subscriptions.router, prefix=api_v1_prefix)
+app.include_router(credits.router, prefix=api_v1_prefix)
 app.include_router(admin.router, prefix=api_v1_prefix)
+app.include_router(admin_credits.router, prefix=api_v1_prefix)
 app.include_router(websocket.router, prefix=api_v1_prefix)
 
 

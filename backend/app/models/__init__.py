@@ -24,6 +24,16 @@ from app.models.subscription import (
 )
 from app.models.analytics import ApiUsageLog, SystemMetric, UserActivity
 from app.models.audit_log import AuditLog, SecurityEvent, AuditAction
+from app.models.credit import (
+    CreditWallet,
+    CreditLedger,
+    CreditPackage,
+    FeatureDefinition,
+    CreditPricing,
+    RateLimitRule,
+    CreditType,
+    CreditTransactionType
+)
 
 __all__ = [
     # User
@@ -65,4 +75,14 @@ __all__ = [
     "AuditLog",
     "SecurityEvent",
     "AuditAction",
+
+    # Credit Management
+    "CreditWallet",
+    "CreditLedger",
+    "CreditPackage",
+    "FeatureDefinition",
+    "CreditPricing",
+    "RateLimitRule",
+    "CreditType",
+    "CreditTransactionType",
 ]
