@@ -4,22 +4,20 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../components/ui/card'
 import { useAuth } from '../../contexts/AuthContext'
-import type { UserRole } from '../../types'
 import Navbar from '../../components/layout/Navbar'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState<UserRole>('user')
-  const [rememberMe, setRememberMe] = useState(false)
-  const { login } = useAuth()
+  const { login, loading, error, user, isAdmin } = useAuth()
   const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await login(email, password, role)
-      navigate(role === 'admin' ? '/admin' : '/dashboard')
+      await login(email, password)
+      // Navigate based on user role from backend
+      navigate(isAdmin ? '/admin' : '/dashboard')
     } catch (error) {
       console.error('Login failed:', error)
     }
@@ -38,28 +36,12 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Role Selection */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Login as</label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={role === 'user' ? 'default' : 'outline'}
-                    className="flex-1"
-                    onClick={() => setRole('user')}
-                  >
-                    User
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={role === 'admin' ? 'default' : 'outline'}
-                    className="flex-1"
-                    onClick={() => setRole('admin')}
-                  >
-                    Admin
-                  </Button>
+              {/* Error Message */}
+              {error && (
+                <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                  <p className="text-sm text-destructive">{error}</p>
                 </div>
-              </div>
+              )}
 
               {/* Email */}
               <div className="space-y-2">
@@ -98,31 +80,18 @@ export default function LoginPage() {
                 />
               </div>
 
-              {/* Remember Me */}
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="remember"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <label htmlFor="remember" className="text-sm">
-                  Remember me
-                </label>
-              </div>
-
               {/* Submit Button */}
-              <Button type="submit" className="w-full">
-                Sign In
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Signing in...' : 'Sign In'}
               </Button>
 
               {/* Demo Credentials */}
               <div className="p-3 bg-muted rounded-md">
                 <p className="text-xs text-muted-foreground mb-2">Demo Credentials:</p>
                 <div className="space-y-1 text-xs">
-                  <p><strong>User:</strong> user@example.com / password</p>
-                  <p><strong>Admin:</strong> admin@example.com / password</p>
+                  <p><strong>Admin:</strong> admin@example.com / Admin123!@#</p>
+                  <p><strong>User:</strong> john@acme.com / User123!@#</p>
+                  <p><strong>User:</strong> jane@startup.io / User123!@#</p>
                 </div>
               </div>
             </form>

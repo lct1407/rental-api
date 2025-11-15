@@ -13,7 +13,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [acceptTerms, setAcceptTerms] = useState(false)
-  const { register } = useAuth()
+  const { register, loading, error } = useAuth()
   const navigate = useNavigate()
 
   const passwordStrength = {
@@ -21,6 +21,7 @@ export default function RegisterPage() {
     hasUpperCase: /[A-Z]/.test(password),
     hasLowerCase: /[a-z]/.test(password),
     hasNumber: /[0-9]/.test(password),
+    hasSpecial: /[!@#$%^&*]/.test(password),
   }
 
   const isPasswordStrong = Object.values(passwordStrength).every(Boolean)
@@ -33,7 +34,12 @@ export default function RegisterPage() {
     }
 
     try {
-      await register(name, email, password)
+      await register({
+        name,
+        email,
+        password,
+        full_name: name
+      })
       navigate('/dashboard')
     } catch (error) {
       console.error('Registration failed:', error)
@@ -53,6 +59,13 @@ export default function RegisterPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Error Message */}
+              {error && (
+                <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                  <p className="text-sm text-destructive">{error}</p>
+                </div>
+              )}
+
               {/* Name */}
               <div className="space-y-2">
                 <label htmlFor="name" className="text-sm font-medium">
@@ -115,6 +128,10 @@ export default function RegisterPage() {
                       met={passwordStrength.hasNumber}
                       text="One number"
                     />
+                    <PasswordRequirement
+                      met={passwordStrength.hasSpecial}
+                      text="One special character (!@#$%^&*)"
+                    />
                   </div>
                 )}
               </div>
@@ -164,9 +181,9 @@ export default function RegisterPage() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={!isPasswordStrong || !passwordsMatch || !acceptTerms}
+                disabled={!isPasswordStrong || !passwordsMatch || !acceptTerms || loading}
               >
-                Create Account
+                {loading ? 'Creating Account...' : 'Create Account'}
               </Button>
             </form>
           </CardContent>

@@ -1,39 +1,82 @@
+import { useState, useEffect } from 'react'
 import MainLayout from '../../components/layout/MainLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
-import { Activity, CreditCard, TrendingUp, Calendar, Copy, ArrowUpRight } from 'lucide-react'
+import { Activity, CreditCard, TrendingUp, Calendar, Copy, ArrowUpRight, Loader2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { mockApiCalls, pricingPlans } from '../../data/mockData'
 import { formatNumber, formatDate } from '../../lib/utils'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Link } from 'react-router-dom'
+import analyticsService from '../../services/analyticsService'
+import apiKeyService from '../../services/apiKeyService'
+import subscriptionService from '../../services/subscriptionService'
+import type { DashboardStats, ApiCallAnalytics } from '../../services/analyticsService'
+import type { ApiKey } from '../../types'
 
 export default function UserDashboard() {
   const { user } = useAuth()
-  const userApiCalls = mockApiCalls.filter(call => call.userId === user?.id)
-  const currentPlan = pricingPlans.find(p => p.id === user?.plan)
+  const [loading, setLoading] = useState(true)
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null)
+  const [analytics, setAnalytics] = useState<ApiCallAnalytics | null>(null)
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
+  const [subscription, setSubscription] = useState<any>(null)
 
-  // Mock usage data for the chart
-  const usageData = [
-    { day: 'Mon', calls: 120 },
-    { day: 'Tue', calls: 180 },
-    { day: 'Wed', calls: 150 },
-    { day: 'Thu', calls: 220 },
-    { day: 'Fri', calls: 190 },
-    { day: 'Sat', calls: 90 },
-    { day: 'Sun', calls: 70 },
-  ]
-
-  const totalCallsThisMonth = usageData.reduce((sum, day) => sum + day.calls, 0)
-  const creditsUsed = userApiCalls.reduce((sum, call) => sum + call.credits, 0)
-  const usagePercentage = currentPlan ? (creditsUsed / currentPlan.credits) * 100 : 0
-
-  const copyApiKey = () => {
-    if (user?.apiKey) {
-      navigator.clipboard.writeText(user.apiKey)
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true)
+        const [stats, analyticsData, keysData, subData] = await Promise.all([
+          analyticsService.getDashboardStats(),
+          analyticsService.getApiCallAnalytics({ start_date: getSevenDaysAgo() }),
+          apiKeyService.listKeys({ limit: 1 }),
+          subscriptionService.getCurrentSubscription().catch(() => null),
+        ])
+        setDashboardStats(stats)
+        setAnalytics(analyticsData)
+        setApiKeys(keysData.items)
+        setSubscription(subData)
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error)
+      } finally {
+        setLoading(false)
+      }
     }
+
+    if (user) {
+      fetchDashboardData()
+    }
+  }, [user])
+
+  const getSevenDaysAgo = () => {
+    const date = new Date()
+    date.setDate(date.getDate() - 7)
+    return date.toISOString()
+  }
+
+  const copyApiKey = (key: string) => {
+    navigator.clipboard.writeText(key)
+  }
+
+  // Transform analytics data for chart
+  const usageData = analytics?.calls_by_day.map(day => ({
+    day: new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' }),
+    calls: day.total,
+  })) || []
+
+  const usagePercentage = dashboardStats
+    ? ((dashboardStats.credits_used_this_month / (user?.credits || 1)) * 100)
+    : 0
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    )
   }
 
   return (
@@ -41,7 +84,7 @@ export default function UserDashboard() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.name}!</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.full_name || user?.username}!</h1>
           <p className="text-muted-foreground">
             Here's what's happening with your API usage
           </p>
@@ -76,10 +119,9 @@ export default function UserDashboard() {
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatNumber(totalCallsThisMonth)}</div>
+              <div className="text-2xl font-bold">{formatNumber(dashboardStats?.api_calls_this_month || 0)}</div>
               <p className="text-xs text-muted-foreground flex items-center mt-1">
-                <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
-                <span className="text-green-500">+12%</span> from last week
+                <span className="text-muted-foreground">{formatNumber(dashboardStats?.api_calls_today || 0)} today</span>
               </p>
             </CardContent>
           </Card>
@@ -112,35 +154,43 @@ export default function UserDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {user?.nextRenewalDate ? new Date(user.nextRenewalDate).getDate() : '-'}
+                {subscription?.current_period_end ? new Date(subscription.current_period_end).getDate() : '-'}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {user?.nextRenewalDate ? formatDate(user.nextRenewalDate) : 'No active subscription'}
+                {subscription?.current_period_end ? formatDate(subscription.current_period_end) : 'No active subscription'}
               </p>
             </CardContent>
           </Card>
         </div>
 
         {/* API Key Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Your API Key</CardTitle>
-            <CardDescription>Use this key to authenticate your API requests</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2">
-              <code className="flex-1 p-3 bg-muted rounded-md text-sm font-mono">
-                {user?.apiKey}
-              </code>
-              <Button variant="outline" size="icon" onClick={copyApiKey}>
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Keep your API key secure. Do not share it publicly.
-            </p>
-          </CardContent>
-        </Card>
+        {apiKeys.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Your API Key</CardTitle>
+              <CardDescription>Use this key to authenticate your API requests</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2">
+                <code className="flex-1 p-3 bg-muted rounded-md text-sm font-mono">
+                  {apiKeys[0].key_prefix}••••{apiKeys[0].last_four}
+                </code>
+                <Button variant="outline" size="icon" onClick={() => copyApiKey(`${apiKeys[0].key_prefix}${apiKeys[0].last_four}`)}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Keep your API key secure. Do not share it publicly.
+              </p>
+              <Link to="/api-keys">
+                <Button variant="link" className="px-0 mt-2">
+                  Manage API Keys
+                  <ArrowUpRight className="ml-1 h-3 w-3" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Usage Chart */}
         <Card>
@@ -164,49 +214,50 @@ export default function UserDashboard() {
         {/* Recent API Calls */}
         <Card>
           <CardHeader>
-            <CardTitle>Recent API Calls</CardTitle>
-            <CardDescription>Your latest API requests</CardDescription>
+            <CardTitle>API Call Statistics</CardTitle>
+            <CardDescription>Overview of your API usage</CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Timestamp</TableHead>
-                  <TableHead>Endpoint</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Response Time</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {userApiCalls.slice(0, 5).map((call) => (
-                  <TableRow key={call.id}>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {new Date(call.timestamp).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{call.endpoint}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs">
-                        {call.method}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={call.status === 200 ? 'success' : 'destructive'}>
-                        {call.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{call.responseTime}ms</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <div className="text-sm text-muted-foreground">Total Calls</div>
+                <div className="text-2xl font-bold">{formatNumber(analytics?.total_calls || 0)}</div>
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">Successful</div>
+                <div className="text-2xl font-bold text-green-500">{formatNumber(analytics?.successful_calls || 0)}</div>
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">Failed</div>
+                <div className="text-2xl font-bold text-red-500">{formatNumber(analytics?.failed_calls || 0)}</div>
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">Avg Response</div>
+                <div className="text-2xl font-bold">{analytics?.avg_response_time || 0}ms</div>
+              </div>
+            </div>
 
-            {userApiCalls.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No API calls yet</p>
-                <Button variant="outline" className="mt-4">
-                  View Documentation
-                </Button>
+            {analytics && analytics.calls_by_endpoint && analytics.calls_by_endpoint.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-sm font-medium mb-3">Top Endpoints</h4>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Endpoint</TableHead>
+                      <TableHead>Calls</TableHead>
+                      <TableHead>Avg Response</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {analytics.calls_by_endpoint.slice(0, 5).map((endpoint, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-mono text-xs">{endpoint.endpoint}</TableCell>
+                        <TableCell>{formatNumber(endpoint.count)}</TableCell>
+                        <TableCell className="text-muted-foreground">{endpoint.avg_response_time}ms</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             )}
           </CardContent>
