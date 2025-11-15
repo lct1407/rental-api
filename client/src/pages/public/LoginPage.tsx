@@ -4,25 +4,52 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../components/ui/card'
 import { useAuth } from '../../contexts/AuthContext'
-import type { UserRole } from '../../types'
 import Navbar from '../../components/layout/Navbar'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState<UserRole>('user')
   const [rememberMe, setRememberMe] = useState(false)
-  const { login } = useAuth()
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const { login, user } = useAuth()
   const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
+    setLoading(true)
+
     try {
-      await login(email, password, role)
-      navigate(role === 'admin' ? '/admin' : '/dashboard')
-    } catch (error) {
+      const result = await login(email, password)
+
+      // Check if 2FA is required
+      if (result && 'requires_2fa' in result) {
+        // TODO: Navigate to 2FA page with temp token
+        console.log('2FA required:', result)
+        setError('2FA is required. This feature is coming soon.')
+        setLoading(false)
+        return
+      }
+
+      // Login successful - navigate based on user role
+      // Note: user will be updated in AuthContext
+      setLoading(false)
+    } catch (error: unknown) {
+      setLoading(false)
+      if (error && typeof error === 'object' && 'detail' in error) {
+        setError((error as { detail: string }).detail)
+      } else {
+        setError('Login failed. Please check your credentials.')
+      }
       console.error('Login failed:', error)
     }
+  }
+
+  // Navigate when user is authenticated
+  if (user) {
+    const destination = user.role === 'admin' ? '/admin' : '/dashboard'
+    navigate(destination)
   }
 
   return (
@@ -38,28 +65,12 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Role Selection */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Login as</label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={role === 'user' ? 'default' : 'outline'}
-                    className="flex-1"
-                    onClick={() => setRole('user')}
-                  >
-                    User
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={role === 'admin' ? 'default' : 'outline'}
-                    className="flex-1"
-                    onClick={() => setRole('admin')}
-                  >
-                    Admin
-                  </Button>
+              {/* Error Message */}
+              {error && (
+                <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">
+                  {error}
                 </div>
-              </div>
+              )}
 
               {/* Email */}
               <div className="space-y-2">
@@ -113,17 +124,16 @@ export default function LoginPage() {
               </div>
 
               {/* Submit Button */}
-              <Button type="submit" className="w-full">
-                Sign In
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Signing In...' : 'Sign In'}
               </Button>
 
-              {/* Demo Credentials */}
+              {/* Demo Info */}
               <div className="p-3 bg-muted rounded-md">
-                <p className="text-xs text-muted-foreground mb-2">Demo Credentials:</p>
-                <div className="space-y-1 text-xs">
-                  <p><strong>User:</strong> user@example.com / password</p>
-                  <p><strong>Admin:</strong> admin@example.com / password</p>
-                </div>
+                <p className="text-xs text-muted-foreground mb-2">Note:</p>
+                <p className="text-xs text-muted-foreground">
+                  Use your registered email and password to log in. The system will automatically determine your role.
+                </p>
               </div>
             </form>
           </CardContent>

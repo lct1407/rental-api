@@ -8,12 +8,15 @@ import { Check, X } from 'lucide-react'
 import Navbar from '../../components/layout/Navbar'
 
 export default function RegisterPage() {
-  const [name, setName] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [acceptTerms, setAcceptTerms] = useState(false)
-  const { register } = useAuth()
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const { register, user } = useAuth()
   const navigate = useNavigate()
 
   const passwordStrength = {
@@ -21,6 +24,7 @@ export default function RegisterPage() {
     hasUpperCase: /[A-Z]/.test(password),
     hasLowerCase: /[a-z]/.test(password),
     hasNumber: /[0-9]/.test(password),
+    hasSpecial: /[!@#$%^&*()_+\-=[\]{}|;:,.<>?]/.test(password),
   }
 
   const isPasswordStrong = Object.values(passwordStrength).every(Boolean)
@@ -28,16 +32,38 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
+
     if (!isPasswordStrong || !passwordsMatch || !acceptTerms) {
+      setError('Please meet all requirements before submitting.')
       return
     }
 
+    setLoading(true)
+
     try {
-      await register(name, email, password)
-      navigate('/dashboard')
-    } catch (error) {
+      await register({
+        email,
+        username,
+        password,
+        full_name: fullName || undefined,
+      })
+      // User will be set in AuthContext, navigate happens below
+    } catch (error: unknown) {
+      setLoading(false)
+      if (error && typeof error === 'object' && 'detail' in error) {
+        setError((error as { detail: string }).detail)
+      } else {
+        setError('Registration failed. Please try again.')
+      }
       console.error('Registration failed:', error)
     }
+  }
+
+  // Navigate when user is authenticated
+  if (user) {
+    const destination = user.role === 'admin' ? '/admin' : '/dashboard'
+    navigate(destination)
   }
 
   return (
@@ -53,19 +79,44 @@ export default function RegisterPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Name */}
+              {/* Error Message */}
+              {error && (
+                <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">
+                  {error}
+                </div>
+              )}
+
+              {/* Full Name */}
               <div className="space-y-2">
-                <label htmlFor="name" className="text-sm font-medium">
-                  Full Name
+                <label htmlFor="fullName" className="text-sm font-medium">
+                  Full Name (Optional)
                 </label>
                 <Input
-                  id="name"
+                  id="fullName"
                   type="text"
                   placeholder="John Doe"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
                 />
+              </div>
+
+              {/* Username */}
+              <div className="space-y-2">
+                <label htmlFor="username" className="text-sm font-medium">
+                  Username
+                </label>
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="johndoe"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  minLength={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Letters, numbers, hyphens, and underscores only (min 3 characters)
+                </p>
               </div>
 
               {/* Email */}
@@ -114,6 +165,10 @@ export default function RegisterPage() {
                     <PasswordRequirement
                       met={passwordStrength.hasNumber}
                       text="One number"
+                    />
+                    <PasswordRequirement
+                      met={passwordStrength.hasSpecial}
+                      text="One special character (!@#$%^&*...)"
                     />
                   </div>
                 )}
@@ -164,9 +219,9 @@ export default function RegisterPage() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={!isPasswordStrong || !passwordsMatch || !acceptTerms}
+                disabled={!isPasswordStrong || !passwordsMatch || !acceptTerms || loading}
               >
-                Create Account
+                {loading ? 'Creating Account...' : 'Create Account'}
               </Button>
             </form>
           </CardContent>

@@ -1,12 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import type { User, UserRole } from '../types'
-import { generateApiKey } from '../lib/utils'
+import type { User, RegisterData, TempTokenResponse } from '../types'
+import { authService } from '../services/auth.service'
+import { userService } from '../services/user.service'
+import { apiService } from '../services/api'
 
 interface AuthContextType {
   user: User | null
-  login: (email: string, password: string, role: UserRole) => Promise<void>
-  register: (name: string, email: string, password: string) => Promise<void>
-  logout: () => void
+  loading: boolean
+  login: (email: string, password: string) => Promise<void | TempTokenResponse>
+  register: (data: RegisterData) => Promise<void>
+  logout: () => Promise<void>
+  verify2FA: (tempToken: string, code: string) => Promise<void>
+  refreshUser: () => Promise<void>
   isAuthenticated: boolean
   isAdmin: boolean
 }
@@ -14,65 +19,97 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    const stored = localStorage.getItem('user')
-    return stored ? JSON.parse(stored) : null
-  })
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
+  // Initialize - check if user is authenticated and fetch user data
   useEffect(() => {
-    if (user) {
-      localStorage.setItem('user', JSON.stringify(user))
-    } else {
-      localStorage.removeItem('user')
+    const initializeAuth = async () => {
+      try {
+        if (apiService.isAuthenticated()) {
+          // Fetch current user profile
+          const userData = await userService.getCurrentUser()
+          setUser(userData)
+        }
+      } catch (error) {
+        console.error('Failed to initialize auth:', error)
+        // Clear invalid tokens
+        apiService.clearTokens()
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [user])
 
-  const login = async (email: string, _password: string, role: UserRole) => {
-    // Mock login - in production, this would call an API
-    const mockUser: User = {
-      id: '1',
-      name: role === 'admin' ? 'Admin User' : 'John Doe',
-      email,
-      role,
-      plan: 'pro',
-      credits: 10000,
-      apiKey: generateApiKey(),
-      status: 'active',
-      registrationDate: new Date().toISOString(),
-      nextRenewalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      billingCycle: 'monthly',
+    initializeAuth()
+  }, [])
+
+  const login = async (email: string, password: string): Promise<void | TempTokenResponse> => {
+    try {
+      const response = await authService.login({ email, password })
+
+      // Check if 2FA is required
+      if ('requires_2fa' in response && response.requires_2fa) {
+        return response as TempTokenResponse
+      }
+
+      // Login successful, set user
+      setUser(response.user)
+    } catch (error) {
+      console.error('Login error:', error)
+      throw error
     }
-    setUser(mockUser)
   }
 
-  const register = async (name: string, email: string, _password: string) => {
-    // Mock registration - in production, this would call an API
-    const newUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      name,
-      email,
-      role: 'user',
-      plan: 'free',
-      credits: 1000,
-      apiKey: generateApiKey(),
-      status: 'active',
-      registrationDate: new Date().toISOString(),
-      billingCycle: 'monthly',
+  const verify2FA = async (tempToken: string, code: string): Promise<void> => {
+    try {
+      const response = await authService.verify2FA(tempToken, code)
+      setUser(response.user)
+    } catch (error) {
+      console.error('2FA verification error:', error)
+      throw error
     }
-    setUser(newUser)
   }
 
-  const logout = () => {
-    setUser(null)
+  const register = async (data: RegisterData): Promise<void> => {
+    try {
+      const response = await authService.register(data)
+      setUser(response.user)
+    } catch (error) {
+      console.error('Registration error:', error)
+      throw error
+    }
+  }
+
+  const logout = async (): Promise<void> => {
+    try {
+      await authService.logout()
+    } catch (error) {
+      console.error('Logout error:', error)
+    } finally {
+      setUser(null)
+    }
+  }
+
+  const refreshUser = async (): Promise<void> => {
+    try {
+      const userData = await userService.getCurrentUser()
+      setUser(userData)
+    } catch (error) {
+      console.error('Failed to refresh user:', error)
+      throw error
+    }
   }
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        loading,
         login,
         register,
         logout,
+        verify2FA,
+        refreshUser,
         isAuthenticated: !!user,
         isAdmin: user?.role === 'admin',
       }}
