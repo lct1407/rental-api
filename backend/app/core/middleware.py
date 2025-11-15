@@ -249,3 +249,130 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
             )
 
         return await call_next(request)
+
+
+class CreditAndRateLimitHeadersMiddleware(BaseHTTPMiddleware):
+    """
+    Add credit balance and rate limit information to response headers
+    Provides real-time credit and rate limit status to clients
+    """
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        # Skip for health checks and docs
+        if request.url.path in ["/health", "/health/ready", "/metrics", "/docs", "/redoc", "/openapi.json"]:
+            return await call_next(request)
+
+        # Track request start time
+        start_time = time.time()
+
+        # Get user info from request state (set by auth dependency)
+        user_id = getattr(request.state, "user_id", None)
+        api_key_id = getattr(request.state, "api_key_id", None)
+
+        # Process request
+        response = await call_next(request)
+
+        # Add timing header
+        duration_ms = (time.time() - start_time) * 1000
+        response.headers["X-Response-Time"] = f"{duration_ms:.2f}ms"
+
+        # Add credit and rate limit headers if user is authenticated
+        if user_id:
+            try:
+                # Get credit balance from cache first
+                credit_balance = await RedisCache.get(f"credit_balance:{user_id}")
+
+                if credit_balance is None:
+                    # Fetch from database and cache
+                    from app.services.credit_service import CreditService
+                    from app.database import get_db_session
+
+                    async with get_db_session() as db:
+                        balance_data = await CreditService.get_credit_balance(
+                            db, user_id, include_packages=False
+                        )
+
+                        credit_balance = balance_data.get("total_balance", 0)
+                        monthly_balance = balance_data.get("monthly_balance", 0)
+                        purchased_balance = balance_data.get("purchased_balance", 0)
+                        next_reset = balance_data.get("next_monthly_reset", "")
+
+                        # Cache for 5 minutes
+                        await RedisCache.set(f"credit_balance:{user_id}", credit_balance, expire=300)
+                        await RedisCache.set(f"credit_monthly:{user_id}", monthly_balance, expire=300)
+                        await RedisCache.set(f"credit_purchased:{user_id}", purchased_balance, expire=300)
+                        await RedisCache.set(f"credit_reset:{user_id}", next_reset, expire=300)
+                else:
+                    monthly_balance = await RedisCache.get(f"credit_monthly:{user_id}") or 0
+                    purchased_balance = await RedisCache.get(f"credit_purchased:{user_id}") or 0
+                    next_reset = await RedisCache.get(f"credit_reset:{user_id}") or ""
+
+                # Add credit headers
+                response.headers["X-Credits-Remaining"] = str(credit_balance)
+                response.headers["X-Credits-Monthly"] = str(monthly_balance)
+                response.headers["X-Credits-Purchased"] = str(purchased_balance)
+                response.headers["X-Credits-Reset"] = str(next_reset)
+
+                # Get rate limit status from cache
+                from app.services.rate_limiter import RateLimiter
+
+                # Get current usage
+                rpm_current = await RateLimiter._get_usage(user_id, "minute")
+                rph_current = await RateLimiter._get_usage(user_id, "hour")
+                rpd_current = await RateLimiter._get_usage(user_id, "day")
+                rpm_current_month = await RateLimiter._get_usage(user_id, "month")
+
+                # Get limits (these would be cached per user plan)
+                limits_key = f"user_limits:{user_id}"
+                cached_limits = await RedisCache.get(limits_key)
+
+                if cached_limits:
+                    import json
+                    limits = json.loads(cached_limits)
+                else:
+                    # Fetch limits from database
+                    from app.database import get_db_session
+
+                    async with get_db_session() as db:
+                        limits_dict = await RateLimiter._get_user_limits(db, user_id)
+
+                        # Cache limits for 1 hour
+                        await RedisCache.set(
+                            limits_key,
+                            json.dumps(limits_dict),
+                            expire=3600
+                        )
+                        limits = limits_dict
+
+                # Add rate limit headers
+                rpm_limit = limits.get("rpm", 60)
+                rph_limit = limits.get("rph", 1000)
+                rpd_limit = limits.get("rpd", 10000)
+                monthly_limit = limits.get("monthly", 300000)
+
+                response.headers["X-RateLimit-Limit-RPM"] = str(rpm_limit)
+                response.headers["X-RateLimit-Remaining-RPM"] = str(max(0, rpm_limit - rpm_current))
+                response.headers["X-RateLimit-Limit-RPH"] = str(rph_limit)
+                response.headers["X-RateLimit-Remaining-RPH"] = str(max(0, rph_limit - rph_current))
+                response.headers["X-RateLimit-Limit-Daily"] = str(rpd_limit)
+                response.headers["X-RateLimit-Remaining-Daily"] = str(max(0, rpd_limit - rpd_current))
+                response.headers["X-RateLimit-Limit-Monthly"] = str(monthly_limit)
+                response.headers["X-RateLimit-Remaining-Monthly"] = str(max(0, monthly_limit - rpm_current_month))
+
+                # Add warnings if approaching limits
+                if int(credit_balance) < 100:
+                    response.headers["X-Credits-Warning"] = "Low credit balance"
+
+                rpm_remaining = rpm_limit - rpm_current
+                if rpm_remaining < rpm_limit * 0.1:  # Less than 10% remaining
+                    response.headers["X-RateLimit-Warning"] = "Approaching rate limit"
+
+            except Exception as e:
+                # Log error but don't fail the request
+                logger.error(
+                    "failed_to_add_credit_headers",
+                    user_id=user_id,
+                    error=str(e)
+                )
+
+        return response

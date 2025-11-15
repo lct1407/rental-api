@@ -120,6 +120,14 @@ class User(Base):
         lazy="selectin"
     )
 
+    credit_wallet = relationship(
+        "CreditWallet",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"
 
