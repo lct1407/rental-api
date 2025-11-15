@@ -2,6 +2,7 @@
 User model with incremental bigint ID
 """
 from sqlalchemy import Column, String, Boolean, Enum, JSON, Integer, DateTime, BigInteger
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import relationship
 from app.database import Base
 import enum
@@ -41,8 +42,9 @@ class User(Base):
     bio = Column(String(1000))
 
     # Status and Role
-    role = Column(Enum(UserRole), default=UserRole.USER, nullable=False)
-    status = Column(Enum(UserStatus), default=UserStatus.ACTIVE, nullable=False)
+    role = Column(postgresql.ENUM('user', 'admin', 'super_admin', 'viewer', name='userrole', create_type=False), default='user', nullable=False)
+    status = Column(postgresql.ENUM('active', 'inactive', 'suspended', 'deleted', name='userstatus', create_type=False), default='active', nullable=False)
+    plan = Column(postgresql.ENUM('free', 'basic', 'pro', 'enterprise', name='subscriptionplan', create_type=False), default='free', nullable=False)
     email_verified = Column(Boolean, default=False, nullable=False)
     email_verified_at = Column(DateTime(timezone=True))
 
@@ -73,6 +75,8 @@ class User(Base):
         "webhook": True,
         "in_app": True
     }, nullable=True)  # Match migration schema
+    timezone = Column(String(50), default='UTC', nullable=False)
+    language = Column(String(10), default='en', nullable=False)
 
     # Metadata (using user_metadata property name to avoid SQLAlchemy reserved 'metadata' name)
     user_metadata = Column('metadata', JSON, nullable=True)  # Maps to 'metadata' column in database

@@ -71,7 +71,7 @@ async def seed_users(db: AsyncSession):
             "full_name": "System Administrator",
             "role": UserRole.SUPER_ADMIN.value,
             "status": UserStatus.ACTIVE.value,
-
+            "plan": "enterprise",
             "credits": 100000,
             "email_verified": True,
             "phone_number": "+1234567890",
@@ -84,7 +84,7 @@ async def seed_users(db: AsyncSession):
             "full_name": "Enterprise User",
             "role": UserRole.USER.value,
             "status": UserStatus.ACTIVE.value,
-
+            "plan": "enterprise",
             "credits": 50000,
             "email_verified": True,
             "phone_number": "+1234567891",
@@ -98,7 +98,7 @@ async def seed_users(db: AsyncSession):
             "full_name": "Pro User",
             "role": UserRole.USER.value,
             "status": UserStatus.ACTIVE.value,
-
+            "plan": "pro",
             "credits": 5000,
             "email_verified": True,
             "phone_number": "+1234567892",
@@ -112,7 +112,7 @@ async def seed_users(db: AsyncSession):
             "full_name": "Basic User",
             "role": UserRole.USER.value,
             "status": UserStatus.ACTIVE.value,
-
+            "plan": "basic",
             "credits": 1000,
             "email_verified": True,
             "phone_number": "+1234567893",
@@ -126,7 +126,7 @@ async def seed_users(db: AsyncSession):
             "full_name": "Free User",
             "role": UserRole.USER.value,
             "status": UserStatus.ACTIVE.value,
-
+            "plan": "free",
             "credits": 100,
             "email_verified": True,
             "phone_number": "+1234567894",
@@ -139,7 +139,7 @@ async def seed_users(db: AsyncSession):
             "full_name": "Admin User",
             "role": UserRole.ADMIN.value,
             "status": UserStatus.ACTIVE.value,
-
+            "plan": "pro",
             "credits": 25000,
             "email_verified": True,
             "phone_number": "+1234567895",
@@ -167,9 +167,9 @@ async def seed_users(db: AsyncSession):
 
     await db.commit()
 
-    # Refresh to get IDs
-    for user in created_users:
-        await db.refresh(user)
+    # Refresh to get IDs - disabled to avoid loading relationships with schema mismatches
+    # for user in created_users:
+    #     await db.refresh(user)
 
     print(f"✅ Created {len(created_users)} users")
     return created_users
@@ -563,14 +563,14 @@ async def main():
             # Clear existing data (skip for now - tables may not exist)
             # await clear_database(async_session)
 
-            # Seed data
+            # Seed data - Only users for now (other models have schema mismatches)
             users = await seed_users(async_session)
-            organizations = await seed_organizations(async_session, users)
-            api_keys = await seed_api_keys(async_session, users, organizations)
-            webhooks = await seed_webhooks(async_session, users, organizations)
-            subscriptions = await seed_subscriptions(async_session, users)
-            payments = await seed_payments(async_session, users, subscriptions)
-            credit_transactions = await seed_credit_transactions(async_session, users, subscriptions, payments)
+            # organizations = await seed_organizations(async_session, users)
+            # api_keys = await seed_api_keys(async_session, users, organizations)
+            # webhooks = await seed_webhooks(async_session, users, organizations)
+            # subscriptions = await seed_subscriptions(async_session, users)
+            # payments = await seed_payments(async_session, users, subscriptions)
+            # credit_transactions = await seed_credit_transactions(async_session, users, subscriptions, payments)
 
             print("\n" + "=" * 80)
             print("✅ DATABASE SEEDING COMPLETE")
@@ -578,24 +578,26 @@ async def main():
 
             print("\n📊 Summary:")
             print(f"   Users: {len(users)}")
-            print(f"   Organizations: {len(organizations)}")
-            print(f"   API Keys: {len(api_keys)}")
-            print(f"   Webhooks: {len(webhooks)}")
-            print(f"   Subscriptions: {len(subscriptions)}")
-            print(f"   Payments: {len(payments)}")
-            print(f"   Credit Transactions: {len(credit_transactions)}")
+            # print(f"   Organizations: {len(organizations)}")
+            # print(f"   API Keys: {len(api_keys)}")
+            # print(f"   Webhooks: {len(webhooks)}")
+            # print(f"   Subscriptions: {len(subscriptions)}")
+            # print(f"   Payments: {len(payments)}")
+            # print(f"   Credit Transactions: {len(credit_transactions)}")
 
             print("\n🔐 Test Credentials:")
             print("   Super Admin:")
-            print("      Email: admin@example.com")
+            print("      Email: thanhlc@sidcorp.co")
             print("      Password: Admin123!@#")
             print()
             print("   Regular Users:")
-            print("      Email: john@acme.com / jane@startup.io / bob@freelance.dev")
-            print("      Password: User123!@#")
+            print("      Enterprise: enterprise-user@sidcorp.co / User123!@#")
+            print("      Pro: pro-user@sidcorp.co / User123!@#")
+            print("      Basic: basic-user@sidcorp.co / User123!@#")
+            print("      Free: free-user@sidcorp.co / User123!@#")
             print()
             print("   Admin:")
-            print("      Email: alice@enterprise.com")
+            print("      Email: admin-user@sidcorp.co")
             print("      Password: User123!@#")
 
         except Exception as e:
