@@ -93,6 +93,20 @@ class Settings(BaseSettings):
             return v
         return ",".join(v) if isinstance(v, list) else v
 
+    @property
+    def origins_list(self) -> List[str]:
+        """Convert ALLOWED_ORIGINS string to list for CORS middleware"""
+        if isinstance(self.ALLOWED_ORIGINS, list):
+            return self.ALLOWED_ORIGINS
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
+
+    @property
+    def hosts_list(self) -> List[str]:
+        """Convert ALLOWED_HOSTS string to list"""
+        if isinstance(self.ALLOWED_HOSTS, list):
+            return self.ALLOWED_HOSTS
+        return [host.strip() for host in self.ALLOWED_HOSTS.split(",")]
+
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
     RATE_LIMIT_PER_HOUR: int = 1000

@@ -7,6 +7,7 @@ import { ThemeProvider } from './contexts/ThemeContext'
 const LandingPage = lazy(() => import('./pages/public/LandingPage'))
 const LoginPage = lazy(() => import('./pages/public/LoginPage'))
 const RegisterPage = lazy(() => import('./pages/public/RegisterPage'))
+const PrivacyPage = lazy(() => import('./pages/public/PrivacyPage'))
 
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
 const UserManagement = lazy(() => import('./pages/admin/UserManagement'))
@@ -46,6 +47,7 @@ function AppRoutes() {
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route
           path="/login"
           element={isAuthenticated ? <Navigate to={isAdmin ? "/admin" : "/dashboard"} replace /> : <LoginPage />}

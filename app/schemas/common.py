@@ -2,8 +2,11 @@
 Common Pydantic schemas and base classes
 """
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, Any, List, Dict
+from typing import Optional, Any, List, Dict, Generic, TypeVar
 from datetime import datetime
+
+# Type variable for generic pagination
+T = TypeVar('T')
 
 
 class BaseSchema(BaseModel):
@@ -28,16 +31,16 @@ class PaginationParams(BaseModel):
     limit: int = Field(default=20, ge=1, le=100, description="Maximum number of records to return")
 
 
-class PaginatedResponse(BaseSchema):
+class PaginatedResponse(BaseSchema, Generic[T]):
     """Paginated response wrapper"""
-    items: List[Any]
+    items: List[T]
     total: int
     skip: int
     limit: int
     has_more: bool
 
     @classmethod
-    def create(cls, items: List[Any], total: int, skip: int, limit: int):
+    def create(cls, items: List[T], total: int, skip: int, limit: int):
         """Create paginated response"""
         return cls(
             items=items,

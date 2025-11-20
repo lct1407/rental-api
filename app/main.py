@@ -14,7 +14,7 @@ from app.config import settings
 from app.database import engine, get_db
 from app.core.middleware import (
     RateLimitMiddleware,
-    RequestLoggingMiddleware,
+    LoggingMiddleware,
     SecurityHeadersMiddleware
 )
 from app.core.cache import RedisCache
@@ -134,7 +134,7 @@ app.openapi = custom_openapi
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=settings.origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -146,7 +146,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Custom middleware (order matters - last added is executed first)
 app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(LoggingMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
 

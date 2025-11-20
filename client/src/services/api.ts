@@ -3,7 +3,8 @@
  *
  * Axios-based HTTP client for communicating with FastAPI backend
  */
-import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios'
+import axios from 'axios'
+import type { AxiosError, AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios'
 
 // API Base URL - can be configured via environment variable
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'

@@ -76,4 +76,4 @@ python-slugify==8.0.1
 pydantic-extra-types==2.4.1
 fastapi-versioning==0.10.0
 psycopg2-binary==2.9.9
-timescale==0.1.1
+# timescale==0.1.0  # Optional: Uncomment if using TimescaleDB
