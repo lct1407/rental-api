@@ -1,0 +1,25 @@
+#!/bin/bash
+# Pre-commit hook to auto-generate API documentation
+
+echo "🔨 Checking for API changes..."
+
+# Check if any API-related files changed
+if git diff --cached --name-only | grep -qE '^app/(api|schemas|core/openapi_config)'; then
+    echo "📝 API changes detected, regenerating documentation..."
+
+    # Generate docs
+    if python scripts/generate_api_docs.py; then
+        echo "✅ Documentation generated successfully"
+
+        # Stage the generated docs
+        git add docs/api/
+        echo "📦 Staged updated documentation files"
+    else
+        echo "❌ Failed to generate documentation"
+        exit 1
+    fi
+else
+    echo "✓ No API changes detected, skipping documentation generation"
+fi
+
+exit 0

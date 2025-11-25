@@ -42,11 +42,11 @@ class UserService:
         user = User(
             email=user_data.email,
             username=user_data.username.lower(),
-            hashed_password=hashed_password,
+            password_hash=hashed_password,
             full_name=user_data.full_name,
-            phone_number=user_data.phone_number,
-            company_name=user_data.company_name,
-            bio=user_data.bio,
+            phone_number=getattr(user_data, 'phone_number', None),
+            company_name=getattr(user_data, 'company_name', None),
+            bio=getattr(user_data, 'bio', None),
             role=UserRole.USER,  # Default role
             status=UserStatus.ACTIVE,
         )

@@ -4,10 +4,12 @@ Main FastAPI Application - Enterprise SaaS API Platform
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import SQLAlchemyError
 from contextlib import asynccontextmanager
+from pathlib import Path
 import logging
 
 from app.config import settings
@@ -111,6 +113,9 @@ app = FastAPI(
 )
 
 
+# Save the original openapi method before overriding
+from fastapi.openapi.utils import get_openapi
+
 # Customize OpenAPI schema
 def custom_openapi():
     """
@@ -119,7 +124,20 @@ def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
 
-    openapi_schema = app.openapi()
+    # Call the original OpenAPI generation directly instead of app.openapi()
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        openapi_version=app.openapi_version,
+        description=app.description,
+        terms_of_service=app.terms_of_service,
+        contact=app.contact,
+        license_info=app.license_info,
+        routes=app.routes,
+        tags=app.openapi_tags,
+        servers=app.servers,
+    )
+
     app.openapi_schema = customize_openapi_schema(openapi_schema)
     return app.openapi_schema
 
@@ -148,7 +166,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Custom middleware (order matters - last added is executed first)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(LoggingMiddleware)
-# app.add_middleware(RateLimitMiddleware)  # Temporarily disabled for testing
+app.add_middleware(RateLimitMiddleware)
 
 
 # ============================================================================
@@ -287,6 +305,45 @@ app.include_router(subscriptions.router, prefix=api_v1_prefix)
 app.include_router(dashboard.router, prefix=api_v1_prefix)
 app.include_router(admin.router, prefix=api_v1_prefix)
 app.include_router(websocket.router, prefix=api_v1_prefix)
+
+
+# ============================================================================
+# Static Documentation Serving
+# ============================================================================
+
+# Mount static documentation files
+docs_path = Path(__file__).parent.parent / "docs" / "api"
+if docs_path.exists():
+    app.mount("/api-docs/static", StaticFiles(directory=str(docs_path)), name="api-docs-static")
+
+    @app.get("/api-docs", include_in_schema=False)
+    async def docs_redirect():
+        """Redirect to documentation index"""
+        return RedirectResponse(url="/api-docs/")
+
+    @app.get("/api-docs/", include_in_schema=False)
+    async def docs_index():
+        """Serve documentation index page"""
+        return FileResponse(docs_path / "index.html")
+
+    @app.get("/api-docs/swagger", include_in_schema=False)
+    async def docs_swagger():
+        """Serve Swagger UI documentation"""
+        return FileResponse(docs_path / "swagger.html")
+
+    @app.get("/api-docs/redoc", include_in_schema=False)
+    async def docs_redoc():
+        """Serve ReDoc documentation"""
+        return FileResponse(docs_path / "redoc.html")
+
+    @app.get("/api-docs/openapi.json", include_in_schema=False)
+    async def docs_openapi_json():
+        """Serve OpenAPI JSON specification"""
+        return FileResponse(
+            docs_path / "openapi.json",
+            media_type="application/json",
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
 
 
 # ============================================================================
