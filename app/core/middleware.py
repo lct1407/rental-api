@@ -75,31 +75,43 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         else:
             limit = settings.RATE_LIMIT_PER_MINUTE
 
-        # Check Redis
+        # Check Redis - use raw integer storage for atomic increment
         key = f"rate_limit:{client_id}:minute"
-        current = await RedisCache.get(key)
 
-        if current is None:
-            # First request
-            await RedisCache.set(key, 1, expire=60)
-            return
+        try:
+            redis = await RedisCache.get_redis()
 
-        if int(current) >= limit:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Rate limit exceeded. Please try again later."
-            )
+            # Use INCR which atomically increments and returns the new value
+            # If key doesn't exist, it's set to 0 before incrementing
+            current = await redis.incr(key)
 
-        # Increment counter
-        await RedisCache.incr(key)
+            # Set expiration on first request (when current == 1)
+            if current == 1:
+                await redis.expire(key, 60)
+
+            if current > limit:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Rate limit exceeded. Please try again later."
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            # If Redis is unavailable, log and allow the request (fail open)
+            logger.warning(f"Rate limiting unavailable (Redis error): {e}")
 
     async def _get_remaining(self, client_id: str) -> int:
         """Get remaining requests for client"""
         key = f"rate_limit:{client_id}:minute"
-        current = await RedisCache.get(key)
-        if current is None:
+        try:
+            redis = await RedisCache.get_redis()
+            current = await redis.get(key)
+            if current is None:
+                return settings.RATE_LIMIT_PER_MINUTE
+            return max(0, settings.RATE_LIMIT_PER_MINUTE - int(current))
+        except Exception:
+            # If Redis is unavailable, return full limit
             return settings.RATE_LIMIT_PER_MINUTE
-        return max(0, settings.RATE_LIMIT_PER_MINUTE - int(current))
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):

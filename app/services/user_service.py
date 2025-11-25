@@ -42,7 +42,7 @@ class UserService:
         user = User(
             email=user_data.email,
             username=user_data.username.lower(),
-            password_hash=hashed_password,
+            hashed_password=hashed_password,
             full_name=user_data.full_name,
             phone_number=getattr(user_data, 'phone_number', None),
             company_name=getattr(user_data, 'company_name', None),

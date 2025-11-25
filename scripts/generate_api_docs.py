@@ -3,7 +3,15 @@ Generate Static API Documentation
 Generates OpenAPI JSON, Swagger UI, and ReDoc HTML files
 """
 import json
+import sys
+import io
 from pathlib import Path
+
+# Fix Windows console encoding for emojis
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 from fastapi.openapi.utils import get_openapi
 
 # Import the FastAPI app

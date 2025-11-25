@@ -5,8 +5,14 @@ Validates all API components after backend restructuring
 """
 import sys
 import os
+import io
 from pathlib import Path
 from typing import List, Dict, Tuple
+
+# Fix Windows console encoding for Unicode characters
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -30,14 +36,14 @@ class APIHealthChecker:
         imports_to_check = [
             ("app.config", "settings"),
             ("app.database", "engine, get_db, Base"),
-            ("app.core.middleware", "RateLimitMiddleware, RequestLoggingMiddleware, SecurityHeadersMiddleware"),
+            ("app.core.middleware", "RateLimitMiddleware, LoggingMiddleware, SecurityHeadersMiddleware"),
             ("app.core.cache", "RedisCache"),
-            ("app.core.security", "create_access_token, verify_password"),
+            ("app.core.security", "SecurityManager"),
             ("app.core.permissions", "require_permission"),
             ("app.core.openapi_config", "get_openapi_tags"),
             ("app.models.user", "User"),
             ("app.models.api_key", "ApiKey"),
-            ("app.schemas.auth", "LoginRequest"),
+            ("app.schemas.auth", "UserLogin"),
             ("app.services.auth_service", "AuthService"),
             ("app.api.v1.auth", "router"),
         ]
@@ -204,8 +210,8 @@ class APIHealthChecker:
         print("=" * 80)
 
         schemas = [
-            ("LoginRequest", "app.schemas.auth"),
-            ("RegisterRequest", "app.schemas.auth"),
+            ("UserLogin", "app.schemas.auth"),
+            ("UserRegister", "app.schemas.auth"),
             ("TokenResponse", "app.schemas.auth"),
             ("UserResponse", "app.schemas.user"),
             ("UserUpdate", "app.schemas.user"),
