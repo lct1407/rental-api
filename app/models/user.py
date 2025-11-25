@@ -36,6 +36,8 @@ class User(Base):
 
     # Profile
     full_name = Column(String(255))
+    first_name = Column(String(100))
+    last_name = Column(String(100))
     avatar_url = Column(String(500))
     phone_number = Column(String(20))
     company_name = Column(String(255))
@@ -60,6 +62,10 @@ class User(Base):
 
     # Credits
     credits = Column(Integer, default=0, nullable=False)
+    credits_free = Column(Integer, default=0, nullable=False)
+    credits_paid = Column(Integer, default=0, nullable=False)
+    credits_total = Column(Integer, default=0, nullable=False)
+    monthly_free_credits = Column(Integer, default=1000, nullable=False)
 
     # Login Tracking
     last_login_at = Column(DateTime(timezone=True))

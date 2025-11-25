@@ -484,3 +484,75 @@ class PaymentService:
         await db.refresh(payment)
 
         return payment
+
+    @staticmethod
+    async def create_credit_purchase_session(
+        db: AsyncSession,
+        user: Any,
+        amount: int,
+        credits: int,
+        bonus_credits: int = 0
+    ) -> str:
+        """
+        Create Stripe checkout session for credit purchase
+
+        Args:
+            db: Database session
+            user: User model instance
+            amount: Purchase amount in USD
+            credits: Total credits to grant (base + bonus)
+            bonus_credits: Bonus credits amount
+
+        Returns:
+            Stripe checkout session URL
+        """
+        try:
+            # Create Stripe checkout session
+            session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price_data': {
+                        'currency': 'usd',
+                        'product_data': {
+                            'name': f'{credits} Credits',
+                            'description': f'Base: {credits - bonus_credits} + Bonus: {bonus_credits}',
+                        },
+                        'unit_amount': amount * 100,  # Convert to cents
+                    },
+                    'quantity': 1,
+                }],
+                mode='payment',
+                success_url=f"{settings.FRONTEND_URL}/dashboard/credits?success=true&session_id={{CHECKOUT_SESSION_ID}}",
+                cancel_url=f"{settings.FRONTEND_URL}/dashboard/credits?canceled=true",
+                customer_email=user.email,
+                metadata={
+                    'user_id': str(user.id),
+                    'credits': str(credits),
+                    'base_credits': str(credits - bonus_credits),
+                    'bonus_credits': str(bonus_credits),
+                    'type': 'credit_purchase'
+                }
+            )
+
+            # Create pending payment record
+            payment = Payment(
+                user_id=user.id,
+                amount=Decimal(str(amount)),
+                currency='USD',
+                status=PaymentStatus.PENDING,
+                provider=PaymentProvider.STRIPE,
+                provider_payment_id=session.id,
+                description=f'Credit purchase: {credits} credits',
+                credits_purchased=credits
+            )
+
+            db.add(payment)
+            await db.commit()
+
+            return session.url
+
+        except stripe.error.StripeError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Stripe error: {str(e)}"
+            )

@@ -253,9 +253,20 @@ export default function LandingPage() {
       </section>
 
       {/* Code Preview Section */}
-      <section className="container mx-auto px-6 md:px-8 py-24 md:py-32 border-t border-[#14B8A6]/20">
+      <section className="relative container mx-auto px-6 md:px-8 py-24 md:py-32 border-t border-[#14B8A6]/20 overflow-hidden">
+        {/* Cloud Computing Background */}
+        <div className="absolute inset-0 -z-10">
+          <img
+            src="/images/cloud-computing.jpg"
+            alt="Cloud Computing Background"
+            className="w-full h-full object-cover"
+          />
+          {/* Dark overlay for readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#020617]/90 via-[#0B1120]/85 to-[#020617]/90"></div>
+        </div>
+
         <motion.div
-          className="max-w-6xl mx-auto"
+          className="max-w-6xl mx-auto relative z-10"
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
@@ -644,9 +655,20 @@ print(result['valid'])  # True`}
       </section>
 
       {/* Pricing Section */}
-      <section className="container mx-auto px-6 md:px-8 py-24 md:py-32 border-t border-[#14B8A6]/20">
+      <section className="relative container mx-auto px-6 md:px-8 py-24 md:py-32 border-t border-[#14B8A6]/20 overflow-hidden">
+        {/* Seaside Landscape Background */}
+        <div className="absolute inset-0 -z-10">
+          <img
+            src="/images/beautiful-seaside-landscape.jpg"
+            alt="Seaside Landscape Background"
+            className="w-full h-full object-cover"
+          />
+          {/* Heavy overlay for readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#020617]/95 via-[#0B1120]/90 to-[#020617]/95"></div>
+        </div>
+
         <motion.div
-          className="text-center max-w-3xl mx-auto mb-16"
+          className="text-center max-w-3xl mx-auto mb-16 relative z-10"
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}

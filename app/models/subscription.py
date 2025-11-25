@@ -198,12 +198,15 @@ class CreditTransaction(Base):
     # Foreign Keys
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     payment_id = Column(BigInteger, ForeignKey("payments.id", ondelete="SET NULL"), nullable=True)
+    service_id = Column(BigInteger, ForeignKey("services.id", ondelete="SET NULL"), nullable=True)
 
     # Transaction Details
     amount = Column(Integer, nullable=False)  # Can be positive (purchase) or negative (usage)
     balance_after = Column(Integer, nullable=False)
     transaction_type = Column(String(50), nullable=False)  # purchase, usage, refund, bonus, expiration
     description = Column(Text)
+    credit_type = Column(String(10))  # 'free' or 'paid'
+    bonus_credits = Column(Integer, default=0, nullable=False)
 
     # Metadata
     user_metadata = Column(JSON, default={}, nullable=False)

@@ -393,3 +393,111 @@ async def get_api_key_usage(
         "expires_at": api_key.expires_at,
         "is_expired": api_key.is_expired()
     }
+
+
+@router.get("/{key_id}/logs")
+async def get_api_key_logs(
+    key_id: int,
+    endpoint: Optional[str] = Query(None, description="Filter by endpoint"),
+    method: Optional[str] = Query(None, description="Filter by HTTP method"),
+    status: Optional[int] = Query(None, description="Filter by status code"),
+    pagination: dict = Depends(get_pagination_params),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get API key request history/logs
+
+    Returns paginated request logs for a specific API key with optional filters.
+
+    **Path Parameters:**
+    - key_id: API key ID
+
+    **Query Parameters:**
+    - page: Page number (default: 1)
+    - limit: Items per page (1-100, default: 20)
+    - endpoint: Filter by endpoint path (optional)
+    - method: Filter by HTTP method (GET, POST, etc) (optional)
+    - status: Filter by HTTP status code (optional)
+
+    **Headers:**
+    - Authorization: Bearer {access_token}
+
+    **Response:**
+    - items: List of request logs with method, endpoint, status, credits, latency, timestamp
+    - total: Total count
+    - page: Current page
+    - limit: Items per page
+    - pages: Total pages
+    """
+    from sqlalchemy import select, and_, func
+    from app.models import ApiUsageLog
+
+    api_key = await ApiKeyService.get_by_id(db, key_id)
+
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="API key not found"
+        )
+
+    # Verify ownership
+    if api_key.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+
+    # Build query conditions
+    conditions = [ApiUsageLog.api_key_id == key_id]
+
+    if endpoint:
+        conditions.append(ApiUsageLog.endpoint.ilike(f"%{endpoint}%"))
+
+    if method:
+        conditions.append(ApiUsageLog.method == method.upper())
+
+    if status is not None:
+        conditions.append(ApiUsageLog.status_code == status)
+
+    # Get paginated logs
+    query = select(ApiUsageLog).where(
+        and_(*conditions)
+    ).order_by(
+        ApiUsageLog.created_at.desc()
+    ).limit(
+        pagination["limit"]
+    ).offset(
+        pagination["skip"]
+    )
+
+    result = await db.execute(query)
+    logs = result.scalars().all()
+
+    # Get total count
+    count_query = select(func.count(ApiUsageLog.id)).where(and_(*conditions))
+    count_result = await db.execute(count_query)
+    total = count_result.scalar_one()
+
+    # Format response
+    items = []
+    for log in logs:
+        items.append({
+            "id": log.id,
+            "method": log.method,
+            "endpoint": log.endpoint,
+            "status": log.status_code,
+            "credits": log.credits_consumed,
+            "latency": log.response_time_ms,
+            "timestamp": log.created_at.isoformat() if log.created_at else None,
+            "ip_address": log.ip_address,
+            "user_agent": log.user_agent
+        })
+
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=(pagination["skip"] // pagination["limit"]) + 1,
+        limit=pagination["limit"],
+        pages=(total + pagination["limit"] - 1) // pagination["limit"]
+    )

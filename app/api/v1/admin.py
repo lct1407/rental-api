@@ -146,11 +146,10 @@ async def get_admin_dashboard(
 
 @router.get(
     "/recent-activity",
-    response_model=List[RecentActivity],
     dependencies=[Depends(require_permissions([Permission.VIEW_ANALYTICS]))]
 )
 async def get_recent_activity(
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(10, ge=1, le=50),
     current_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -160,17 +159,128 @@ async def get_recent_activity(
     Returns recent user activities and system events.
 
     **Query Parameters:**
-    - limit: Number of activities to return (1-100, default: 20)
+    - limit: Number of activities to return (1-50, default: 10)
 
     **Headers:**
     - Authorization: Bearer {admin_access_token}
 
     **Response:**
-    - List of recent activities
+    - List of recent activities with user, action, timestamp, type
     """
-    # TODO: Implement activity tracking
-    # This would query UserActivity model
-    return []
+    from sqlalchemy import select
+    from app.models import UserActivity, User as UserModel
+
+    # Get recent activities with user information
+    query = select(UserActivity, UserModel).join(
+        UserModel, UserActivity.user_id == UserModel.id
+    ).order_by(
+        UserActivity.created_at.desc()
+    ).limit(limit)
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    activities = []
+    for activity, user in rows:
+        # Format timestamp as relative time
+        time_diff = datetime.utcnow() - activity.created_at
+        if time_diff.total_seconds() < 60:
+            timestamp = "Just now"
+        elif time_diff.total_seconds() < 3600:
+            minutes = int(time_diff.total_seconds() / 60)
+            timestamp = f"{minutes} min{'s' if minutes > 1 else ''} ago"
+        elif time_diff.total_seconds() < 86400:
+            hours = int(time_diff.total_seconds() / 3600)
+            timestamp = f"{hours} hour{'s' if hours > 1 else ''} ago"
+        else:
+            days = int(time_diff.total_seconds() / 86400)
+            timestamp = f"{days} day{'s' if days > 1 else ''} ago"
+
+        # Map activity type to display type
+        type_mapping = {
+            "user.registered": "signup",
+            "user.login": "login",
+            "subscription.upgraded": "payment",
+            "subscription.created": "payment",
+            "payment.succeeded": "payment",
+            "api_key.created": "action",
+            "webhook.created": "action",
+        }
+
+        activities.append({
+            "user": user.full_name or user.username,
+            "action": activity.description or activity.activity_type.replace("_", " ").title(),
+            "timestamp": timestamp,
+            "type": type_mapping.get(activity.activity_type, "action")
+        })
+
+    return activities
+
+
+@router.get(
+    "/revenue-chart",
+    dependencies=[Depends(require_permissions([Permission.VIEW_ANALYTICS]))]
+)
+async def get_revenue_chart(
+    year: int = Query(None, description="Year (default: current year)"),
+    current_user: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get monthly revenue chart data
+
+    Returns monthly revenue data for the specified year.
+
+    **Query Parameters:**
+    - year: Year to get data for (default: current year)
+
+    **Headers:**
+    - Authorization: Bearer {admin_access_token}
+
+    **Response:**
+    - List of monthly revenue data with month name and amount
+    """
+    from sqlalchemy import select, func, extract
+    from app.models import Payment
+
+    # Use current year if not specified
+    if year is None:
+        year = datetime.utcnow().year
+
+    # Get monthly revenue
+    query = select(
+        extract('month', Payment.created_at).label('month'),
+        func.sum(Payment.amount).label('revenue')
+    ).where(
+        extract('year', Payment.created_at) == year
+    ).where(
+        Payment.status == "succeeded"
+    ).group_by(
+        'month'
+    ).order_by(
+        'month'
+    )
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    # Month names
+    month_names = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ]
+
+    # Build revenue data for all 12 months
+    revenue_data = []
+    revenue_by_month = {int(row.month): float(row.revenue) for row in rows}
+
+    for month_num in range(1, 13):
+        revenue_data.append({
+            "month": month_names[month_num - 1],
+            "revenue": revenue_by_month.get(month_num, 0.0)
+        })
+
+    return revenue_data
 
 
 @router.get(
@@ -241,7 +351,7 @@ async def get_system_health(
 @router.put(
     "/users/{user_id}",
     response_model=UserResponse,
-    dependencies=[Depends(require_permissions([Permission.MANAGE_USERS]))]
+    dependencies=[Depends(require_permissions([Permission.UPDATE_ALL_USERS]))]
 )
 async def admin_update_user(
     user_id: int,
@@ -278,7 +388,7 @@ async def admin_update_user(
 
 @router.post(
     "/users/batch",
-    dependencies=[Depends(require_permissions([Permission.MANAGE_USERS]))]
+    dependencies=[Depends(require_permissions([Permission.UPDATE_ALL_USERS]))]
 )
 async def batch_user_action(
     batch_action: BatchUserAction,
@@ -389,7 +499,7 @@ async def get_audit_logs(
 @router.get(
     "/security-events",
     response_model=PaginatedResponse[SecurityEventResponse],
-    dependencies=[Depends(require_permissions([Permission.MANAGE_SECURITY]))]
+    dependencies=[Depends(require_permissions([Permission.MANAGE_SYSTEM]))]
 )
 async def get_security_events(
     severity: Optional[str] = Query(None, description="Filter by severity"),

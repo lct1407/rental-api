@@ -24,6 +24,7 @@ from app.models.subscription import (
 )
 from app.models.analytics import ApiUsageLog, SystemMetric, UserActivity
 from app.models.audit_log import AuditLog, SecurityEvent, AuditAction
+from app.models.service import Service
 
 __all__ = [
     # User
@@ -65,4 +66,7 @@ __all__ = [
     "AuditLog",
     "SecurityEvent",
     "AuditAction",
+
+    # Service
+    "Service",
 ]

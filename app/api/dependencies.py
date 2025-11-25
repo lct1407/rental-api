@@ -122,7 +122,7 @@ def require_permissions(permissions: List[Permission]):
     Dependency factory for permission checking
 
     Usage:
-        @router.get("/protected", dependencies=[Depends(require_permissions([Permission.MANAGE_USERS]))])
+        @router.get("/protected", dependencies=[Depends(require_permissions([Permission.UPDATE_ALL_USERS]))])
     """
     async def permission_checker(current_user: User = Depends(get_current_user)) -> User:
         for permission in permissions:

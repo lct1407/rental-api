@@ -15,7 +15,7 @@ from app.schemas.subscription import (
     CreditPurchaseRequest,
     InvoiceResponse,
     CreditTransactionResponse,
-    SubscriptionPlanResponse
+    SubscriptionPlanInfo
 )
 from app.schemas.common import PaginationParams, PaginatedResponse
 from app.services.subscription_service import SubscriptionService
@@ -34,7 +34,7 @@ router = APIRouter(prefix="/subscriptions", tags=["Subscriptions & Billing"])
 # Subscription Plans
 # ============================================================================
 
-@router.get("/plans", response_model=List[SubscriptionPlanResponse])
+@router.get("/plans", response_model=List[SubscriptionPlanInfo])
 async def get_subscription_plans():
     """
     Get available subscription plans
@@ -590,4 +590,270 @@ async def get_usage_summary(
         "credits_remaining": current_user.credits,
         "api_calls_this_period": 0,  # TODO: Get from AnalyticsService
         "estimated_cost": 0.00  # TODO: Calculate based on usage
+    }
+
+
+# ============================================================================
+# Credit Purchase & Billing
+# ============================================================================
+
+@router.post("/credits/purchase")
+async def purchase_credits(
+    amount: int = Query(..., ge=5, le=5000, description="Purchase amount in USD ($5-$5000)"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Purchase credits
+
+    Creates a Stripe checkout session for credit purchase with bonus tiers:
+    - $5-$49: No bonus
+    - $50-$99: 10% bonus
+    - $100-$499: 20% bonus
+    - $500+: 30% bonus
+
+    **Query Parameters:**
+    - amount: Purchase amount in USD (minimum $5, maximum $5000)
+
+    **Headers:**
+    - Authorization: Bearer {access_token}
+
+    **Response:**
+    - checkout_url: Stripe checkout URL
+    - base_credits: Credits for the amount (amount * 100)
+    - bonus_credits: Bonus credits based on tier
+    - total_credits: Base + bonus credits
+    - amount: Purchase amount in USD
+    """
+    # Calculate base credits (1 USD = 100 credits)
+    base_credits = amount * 100
+
+    # Calculate bonus based on tiers
+    if amount >= 500:
+        bonus_rate = 0.30
+    elif amount >= 100:
+        bonus_rate = 0.20
+    elif amount >= 50:
+        bonus_rate = 0.10
+    else:
+        bonus_rate = 0.0
+
+    bonus_credits = int(base_credits * bonus_rate)
+    total_credits = base_credits + bonus_credits
+
+    # Create Stripe checkout session
+    checkout_url = await PaymentService.create_credit_purchase_session(
+        db=db,
+        user=current_user,
+        amount=amount,
+        credits=total_credits,
+        bonus_credits=bonus_credits
+    )
+
+    return {
+        "checkout_url": checkout_url,
+        "base_credits": base_credits,
+        "bonus_credits": bonus_credits,
+        "total_credits": total_credits,
+        "amount": amount,
+        "bonus_rate": bonus_rate * 100
+    }
+
+
+@router.get("/billing/invoices", response_model=List[InvoiceResponse])
+async def get_my_invoices(
+    pagination: dict = Depends(get_pagination_params),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get user invoices
+
+    Returns paginated list of invoices for the authenticated user.
+
+    **Query Parameters:**
+    - page: Page number (default: 1)
+    - limit: Items per page (1-100, default: 20)
+
+    **Headers:**
+    - Authorization: Bearer {access_token}
+
+    **Response:**
+    - List of invoices with ID, date, amount, status, PDF link
+    """
+    from sqlalchemy import select
+    from app.models import Invoice
+
+    # Build query
+    query = select(Invoice).where(
+        Invoice.user_id == current_user.id
+    ).order_by(
+        Invoice.created_at.desc()
+    ).limit(
+        pagination["limit"]
+    ).offset(
+        pagination["skip"]
+    )
+
+    result = await db.execute(query)
+    invoices = result.scalars().all()
+
+    return [InvoiceResponse.model_validate(inv) for inv in invoices]
+
+
+@router.get("/billing/payment-method")
+async def get_payment_method(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get payment method
+
+    Returns the user's current payment method on file.
+
+    **Headers:**
+    - Authorization: Bearer {access_token}
+
+    **Response:**
+    - type: Payment method type (card, paypal, etc)
+    - last4: Last 4 digits of card
+    - brand: Card brand (Visa, Mastercard, etc)
+    - exp_month: Expiration month
+    - exp_year: Expiration year
+    """
+    from sqlalchemy import select
+    from app.models import Payment
+
+    # Get most recent successful payment to extract payment method
+    result = await db.execute(
+        select(Payment)
+        .where(Payment.user_id == current_user.id)
+        .where(Payment.status == "succeeded")
+        .order_by(Payment.created_at.desc())
+        .limit(1)
+    )
+
+    payment = result.scalar_one_or_none()
+
+    if not payment:
+        return {
+            "type": None,
+            "last4": None,
+            "brand": None,
+            "exp_month": None,
+            "exp_year": None,
+            "message": "No payment method on file"
+        }
+
+    return {
+        "type": payment.payment_method_type or "card",
+        "last4": payment.payment_method_last4 or "****",
+        "brand": payment.payment_method_brand or "Unknown",
+        "exp_month": 12,  # TODO: Store expiration in payment model
+        "exp_year": 2024,  # TODO: Store expiration in payment model
+    }
+
+
+@router.get("/billing/credit-history", response_model=PaginatedResponse[CreditTransactionResponse])
+async def get_credit_history(
+    date_range: str = Query("30d", description="Time range: 7d, 30d, 90d, all"),
+    transaction_type: Optional[str] = Query(None, description="Filter by type: in, out, all"),
+    service_id: Optional[int] = Query(None, description="Filter by service ID"),
+    pagination: dict = Depends(get_pagination_params),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get credit transaction history
+
+    Returns paginated credit transaction history with filters.
+
+    **Query Parameters:**
+    - page: Page number (default: 1)
+    - limit: Items per page (1-100, default: 20)
+    - date_range: Time range filter (7d, 30d, 90d, all)
+    - transaction_type: Filter by type (in, out, all)
+    - service_id: Filter by service ID
+
+    **Headers:**
+    - Authorization: Bearer {access_token}
+
+    **Response:**
+    - items: List of credit transactions
+    - total: Total count
+    - summary: Aggregated totals (total_in, total_out, net_change)
+    """
+    from sqlalchemy import select, and_, func
+    from app.models import CreditTransaction, Service
+    from datetime import datetime, timedelta
+
+    # Calculate date filter
+    now = datetime.utcnow()
+    if date_range == "7d":
+        start_date = now - timedelta(days=7)
+    elif date_range == "30d":
+        start_date = now - timedelta(days=30)
+    elif date_range == "90d":
+        start_date = now - timedelta(days=90)
+    else:
+        start_date = None
+
+    # Build base query
+    conditions = [CreditTransaction.user_id == current_user.id]
+
+    if start_date:
+        conditions.append(CreditTransaction.created_at >= start_date)
+
+    if transaction_type == "in":
+        conditions.append(CreditTransaction.amount > 0)
+    elif transaction_type == "out":
+        conditions.append(CreditTransaction.amount < 0)
+
+    if service_id:
+        conditions.append(CreditTransaction.service_id == service_id)
+
+    # Get paginated transactions
+    query = select(CreditTransaction).where(
+        and_(*conditions)
+    ).order_by(
+        CreditTransaction.created_at.desc()
+    ).limit(
+        pagination["limit"]
+    ).offset(
+        pagination["skip"]
+    )
+
+    result = await db.execute(query)
+    transactions = result.scalars().all()
+
+    # Get total count
+    count_query = select(func.count(CreditTransaction.id)).where(and_(*conditions))
+    count_result = await db.execute(count_query)
+    total = count_result.scalar_one()
+
+    # Calculate summary
+    summary_query = select(
+        func.sum(CreditTransaction.amount).filter(CreditTransaction.amount > 0).label('total_in'),
+        func.sum(CreditTransaction.amount).filter(CreditTransaction.amount < 0).label('total_out'),
+        func.sum(CreditTransaction.amount).label('net_change')
+    ).where(and_(*conditions))
+
+    summary_result = await db.execute(summary_query)
+    summary_row = summary_result.one()
+
+    total_in = summary_row.total_in or 0
+    total_out = abs(summary_row.total_out or 0)
+    net_change = summary_row.net_change or 0
+
+    return {
+        "items": [CreditTransactionResponse.model_validate(t) for t in transactions],
+        "total": total,
+        "page": (pagination["skip"] // pagination["limit"]) + 1,
+        "limit": pagination["limit"],
+        "pages": (total + pagination["limit"] - 1) // pagination["limit"],
+        "summary": {
+            "total_in": total_in,
+            "total_out": total_out,
+            "net_change": net_change
+        }
     }

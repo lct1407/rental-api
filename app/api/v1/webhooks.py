@@ -12,7 +12,7 @@ from app.schemas.webhook import (
     WebhookResponse,
     WebhookListResponse,
     WebhookDeliveryResponse,
-    WebhookTestRequest
+    WebhookTest
 )
 from app.schemas.common import PaginationParams, PaginatedResponse
 from app.services.webhook_service import WebhookService
@@ -248,7 +248,7 @@ async def delete_webhook(
 @router.post("/{webhook_id}/test")
 async def test_webhook(
     webhook_id: int,
-    test_data: WebhookTestRequest,
+    test_data: WebhookTest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -544,3 +544,61 @@ async def get_webhook_stats(
     stats = await WebhookService.get_webhook_stats(db, webhook_id)
 
     return stats
+
+
+@router.post("/{webhook_id}/rotate-secret")
+async def rotate_webhook_secret(
+    webhook_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Rotate webhook signing secret
+
+    Generates a new signing secret for the webhook. The old secret is immediately invalidated.
+
+    **Path Parameters:**
+    - webhook_id: Webhook ID
+
+    **Headers:**
+    - Authorization: Bearer {access_token}
+
+    **Response:**
+    - message: Success message
+    - secret: New signing secret (save securely!)
+    - webhook_id: Webhook ID
+
+    **Important:**
+    - Update your webhook verification code with the new secret immediately
+    - The old secret is invalidated and will fail signature verification
+    """
+    webhook = await WebhookService.get_by_id(db, webhook_id)
+
+    if not webhook:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Webhook not found"
+        )
+
+    # Verify ownership
+    if webhook.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+
+    # Generate new secret
+    import secrets
+    new_secret = f"whsec_{secrets.token_urlsafe(32)}"
+
+    # Update webhook
+    webhook.secret = new_secret
+    await db.commit()
+    await db.refresh(webhook)
+
+    return {
+        "message": "Webhook signing secret has been rotated successfully",
+        "secret": new_secret,
+        "webhook_id": webhook.id,
+        "warning": "Update your webhook verification code with the new secret immediately"
+    }

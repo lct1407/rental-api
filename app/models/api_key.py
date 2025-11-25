@@ -17,9 +17,12 @@ class ApiKey(Base):
 
     # Key Details
     name = Column(String(255), nullable=False)
+    project = Column(String(255), default="Default Project", nullable=False)
+    environment = Column(String(10), default="test", nullable=False)  # 'live' or 'test'
     key_hash = Column(String(255), unique=True, index=True, nullable=False)
-    key_prefix = Column(String(20), index=True, nullable=False)  # First 8 chars for identification
+    key_prefix = Column(String(20), index=True, nullable=False)  # Format: rnt_live_* or rnt_test_*
     last_four = Column(String(10), nullable=False)
+    status = Column(String(20), default="active", nullable=False)  # 'active' or 'revoked'
 
     # Permissions and Scopes
     scopes = Column(JSON, default=[], nullable=False)

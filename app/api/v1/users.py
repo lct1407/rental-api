@@ -154,7 +154,7 @@ async def get_my_stats(
 @router.get(
     "",
     response_model=PaginatedResponse[UserListResponse],
-    dependencies=[Depends(require_permissions([Permission.MANAGE_USERS]))]
+    dependencies=[Depends(require_permissions([Permission.UPDATE_ALL_USERS]))]
 )
 async def list_users(
     search: Optional[str] = Query(None, description="Search by email, username, or name"),
@@ -214,7 +214,7 @@ async def list_users(
 @router.get(
     "/{user_id}",
     response_model=UserResponse,
-    dependencies=[Depends(require_permissions([Permission.MANAGE_USERS]))]
+    dependencies=[Depends(require_permissions([Permission.UPDATE_ALL_USERS]))]
 )
 async def get_user_by_id(
     user_id: int,
@@ -248,7 +248,7 @@ async def get_user_by_id(
 @router.put(
     "/{user_id}/suspend",
     response_model=UserResponse,
-    dependencies=[Depends(require_permissions([Permission.MANAGE_USERS]))]
+    dependencies=[Depends(require_permissions([Permission.UPDATE_ALL_USERS]))]
 )
 async def suspend_user(
     user_id: int,
@@ -288,7 +288,7 @@ async def suspend_user(
 @router.put(
     "/{user_id}/activate",
     response_model=UserResponse,
-    dependencies=[Depends(require_permissions([Permission.MANAGE_USERS]))]
+    dependencies=[Depends(require_permissions([Permission.UPDATE_ALL_USERS]))]
 )
 async def activate_user(
     user_id: int,
